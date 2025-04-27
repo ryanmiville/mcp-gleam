@@ -6,12 +6,13 @@ pub type Resource {
     name: String,
     description: Option(String),
     mime_type: Option(String),
-    annotations: Option(List(Annotation)),
+    annotations: Option(Annotations),
+    size: Option(Int),
   )
 }
 
-pub type Annotation {
-  Annotation(audience: Option(List(Role)), priority: Option(Float))
+pub type Annotations {
+  Annotations(audience: Option(List(Role)), priority: Option(Float))
 }
 
 pub type Role {
@@ -20,5 +21,11 @@ pub type Role {
 }
 
 pub type ResourceTemplate {
-  ResourceTemplate(name: String)
+  ResourceTemplate(
+    uri_template: String,
+    name: String,
+    description: Option(String),
+    mime_type: Option(String),
+    annotations: Option(Annotations),
+  )
 }

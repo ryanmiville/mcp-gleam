@@ -1,5 +1,7 @@
+import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/dynamic/decode
+import gleam/function
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/json.{type Json}
@@ -7,6 +9,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleamcp/client/internal
 import gleamcp/mcp.{type McpError, type Prompt}
+import jsonrpc
 
 const method = "prompts/list"
 
@@ -46,21 +49,28 @@ pub fn progress_token(builder: RequestBuilder, token: String) {
 }
 
 pub fn build(builder: RequestBuilder) -> Request(BitArray) {
-  let params =
+  // TODO
+  let id = 1
+  let req = jsonrpc.request(method, jsonrpc.id(id))
+
+  let body =
     internal.merge_params([
       internal.json_pagination(builder.cursor),
       internal.json_meta(builder.meta),
     ])
-  // TODO
-  let id = 1
-  let body = internal.json_rpc_request(id, method, params)
+    |> option.map(jsonrpc.request_params(req, _))
+    |> option.unwrap(req)
+    |> jsonrpc.encode_request(function.identity)
+    |> json.to_string
+    |> bit_array.from_string
+
   internal.request(headers: [], body:)
 }
 
 pub fn response(
   response: Response(BitArray),
 ) -> Result(ListPromptsResult, McpError) {
-  let decoder = mcp.json_rpc_response_decoder(list_prompts_result_decoder())
+  let decoder = jsonrpc.response_decoder(list_prompts_result_decoder())
   response.body
   |> json.parse_bits(decoder)
   |> result.map(fn(res) { res.result })

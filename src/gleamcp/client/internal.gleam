@@ -8,6 +8,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleamcp/mcp
+import jsonrpc
 
 pub fn request(
   headers headers: List(#(String, String)),
@@ -25,16 +26,16 @@ pub fn request(
   )
 }
 
-pub fn json_rpc_request(
-  id: Int,
-  method: String,
-  params: Option(Json),
-) -> BitArray {
-  mcp.JsonRpcRequest(jsonrpc: "2.0", id:, method:, params:)
-  |> mcp.encode_json_rpc_request
-  |> json.to_string
-  |> bit_array.from_string
-}
+// pub fn json_rpc_request(
+//   id: Int,
+//   method: String,
+//   params: Option(Json),
+// ) -> BitArray {
+//   jsonrpc.request(id: jsonrpc.id(id), method:)
+//   |> mcp.encode_json_rpc_request
+//   |> json.to_string
+//   |> bit_array.from_string
+// }
 
 pub fn json_pagination(cursor: Option(String)) -> Option(List(#(String, Json))) {
   option.map(cursor, fn(cursor) { [#("cursor", json.string(cursor))] })
@@ -50,26 +51,9 @@ pub fn json_meta(meta: Dict(String, Json)) -> Option(List(#(String, Json))) {
 pub fn json_rpc_response(
   bits: BitArray,
   decoder: Decoder(a),
-) -> Result(mcp.JsonRpcResponse(a), mcp.McpError) {
-  json.parse_bits(bits, json_rpc_response_decoder(decoder))
+) -> Result(jsonrpc.Response(a), mcp.McpError) {
+  json.parse_bits(bits, jsonrpc.response_decoder(decoder))
   |> result.map_error(mcp.UnexpectedJsonError)
-}
-
-fn json_rpc_response_decoder(
-  inner: Decoder(a),
-) -> Decoder(mcp.JsonRpcResponse(a)) {
-  use jsonrpc <- decode.field("jsonrpc", decode.string)
-  use id <- decode.field("id", decode.int)
-  use result <- decode.field("result", inner)
-  decode.success(mcp.JsonRpcResponse(jsonrpc:, id:, result:))
-  // let error_decoder = {
-  //   use jsonrpc <- decode.field("jsonrpc", decode.string)
-  //   use id <- decode.field("id", decode.int)
-  //   use error <- decode.field("error", mcp.error_decoder())
-  //   decode.success(mcp.JsonRpcResponseError(jsonrpc:, id:, error:))
-  // }
-
-  // decode.one_of(result_decoder, [error_decoder])
 }
 
 pub fn merge_params(params: List(Option(List(#(String, Json))))) -> Option(Json) {

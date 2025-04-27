@@ -67,3 +67,8 @@ let res = resource.TextContents(
 )
 [res]
 ```
+
+### Unsupported Features
+* batch messages
+* resource subscribe
+* server notifications (resources cannot change yet)
