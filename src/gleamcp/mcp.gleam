@@ -169,12 +169,24 @@ fn implementation_decoder() -> Decoder(Implementation) {
   decode.success(Implementation(name:, version:))
 }
 
+pub type Sampling {
+  Sampling
+}
+
+fn encode_sampling(sampling: Sampling) -> Json {
+  json.object([])
+}
+
+fn sampling_decoder() -> Decoder(Sampling) {
+  decode.success(Sampling)
+}
+
 /// Capabilities supported by a client
 pub type ClientCapabilities {
   ClientCapabilities(
     roots: Option(RootCapabilities),
-    sampling: Option(Dict(String, Dynamic)),
-    experimental: Option(Dict(String, Dict(String, Dynamic))),
+    sampling: Option(Sampling),
+    // experimental: Option(Dict(String, Dict(String, Dynamic))),
   )
 }
 
@@ -193,6 +205,18 @@ fn root_capabilities_decoder() -> Decoder(RootCapabilities) {
   decode.success(RootCapabilities(list_changed:))
 }
 
+pub type Completions {
+  Completions
+}
+
+fn encode_completions(completions: Completions) -> Json {
+  json.object([])
+}
+
+fn completions_decoder() -> Decoder(Completions) {
+  decode.success(Completions)
+}
+
 /// Capabilities supported by a server
 pub type ServerCapabilities {
   ServerCapabilities(
@@ -200,8 +224,8 @@ pub type ServerCapabilities {
     prompts: Option(PromptCapabilities),
     tools: Option(ToolCapabilities),
     logging: Option(LoggingCapabilities),
-    completions: Option(Dict(String, Dynamic)),
-    experimental: Option(Dict(String, Dict(String, Dynamic))),
+    completions: Option(Completions),
+    // experimental: Option(Dict(String, Dict(String, Dynamic))),
   )
 }
 
@@ -706,11 +730,11 @@ pub type InitializeResult {
 }
 
 fn meta_decoder() -> Decoder(Dict(String, Dynamic)) {
-  todo
+  decode.success(dict.new())
 }
 
 fn encode_meta(meta: Dict(String, Dynamic)) -> Json {
-  todo
+  json.object([])
 }
 
 pub fn encode_initialize_result(initialize_result: InitializeResult) -> Json {
@@ -1029,7 +1053,7 @@ pub type CreateMessageResult {
 
 /// List roots request
 pub type ListRootsRequest {
-  ListRootsRequest(method: String, params: Option(Dict(String, Dynamic)))
+  ListRootsRequest
 }
 
 /// List roots result
@@ -1131,82 +1155,54 @@ fn client_capabilities_decoder() -> Decoder(ClientCapabilities) {
   use sampling <- decode.optional_field(
     "sampling",
     None,
-    decode.optional(decode.dict(decode.string, decode.dynamic)),
+    decode.optional(sampling_decoder()),
   )
-  use experimental <- decode.optional_field(
-    "experimental",
-    None,
-    decode.optional(decode.dict(
-      decode.string,
-      decode.dict(decode.string, decode.dynamic),
-    )),
-  )
+  // use experimental <- decode.optional_field(
+  //   "experimental",
+  //   None,
+  //   decode.optional(decode.dict(
+  //     decode.string,
+  //     decode.dict(decode.string, decode.dynamic),
+  //   )),
+  // )
   decode.success(ClientCapabilities(
     roots: roots,
     sampling: sampling,
-    experimental: experimental,
+    // experimental: experimental,
   ))
 }
 
 fn encode_client_capabilities(capabilities: ClientCapabilities) -> Json {
+  let ClientCapabilities(roots:, sampling:) = capabilities
   todo
-  // let ClientCapabilities(roots:, sampling:, experimental:) = capabilities
+  let optional_fields =
+    [
+      option.map(roots, fn(r) { #("roots", encode_root_capabilities(r)) }),
+      option.map(sampling, fn(s) { #("sampling", encode_sampling(s)) }),
+    ]
+    |> option.values
 
-  // let optional_fields =
-  //   [
-  //     option.map(roots, fn(r) { #("roots", encode_root_capabilities(r)) }),
-  //     option.map(sampling, fn(s) {
-  //       #("sampling", json.dict(s, fn(k) { k }, fn(v) { v }))
-  //     }),
-  //     option.map(experimental, fn(e) {
-  //       #(
-  //         "experimental",
-  //         json.dict(e, fn(k) { k }, fn(d) {
-  //           json.dict(d, fn(k) { k }, fn(v) { v })
-  //         }),
-  //       )
-  //     }),
-  //   ]
-  //   |> option.values
-
-  // json.object(optional_fields)
+  json.object(optional_fields)
 }
 
 // Server capabilities encoder
 fn encode_server_capabilities(capabilities: ServerCapabilities) -> Json {
-  todo
-  // let ServerCapabilities(
-  //   resources:,
-  //   prompts:,
-  //   tools:,
-  //   logging:,
-  //   completions:,
-  //   experimental:,
-  // ) = capabilities
+  let ServerCapabilities(resources:, prompts:, tools:, logging:, completions:) =
+    capabilities
 
-  // let optional_fields =
-  //   [
-  //     option.map(resources, fn(r) {
-  //       #("resources", encode_resource_capabilities(r))
-  //     }),
-  //     option.map(prompts, fn(p) { #("prompts", encode_prompt_capabilities(p)) }),
-  //     option.map(tools, fn(t) { #("tools", encode_tool_capabilities(t)) }),
-  //     option.map(logging, fn(l) { #("logging", encode_logging_capabilities(l)) }),
-  //     option.map(completions, fn(c) {
-  //       #("completions", json.dict(c, fn(k) { k }, fn(v) { v }))
-  //     }),
-  //     option.map(experimental, fn(e) {
-  //       #(
-  //         "experimental",
-  //         json.dict(e, fn(k) { k }, fn(d) {
-  //           json.dict(d, fn(k) { k }, fn(v) { v })
-  //         }),
-  //       )
-  //     }),
-  //   ]
-  //   |> option.values
+  let optional_fields =
+    [
+      option.map(resources, fn(r) {
+        #("resources", encode_resource_capabilities(r))
+      }),
+      option.map(prompts, fn(p) { #("prompts", encode_prompt_capabilities(p)) }),
+      option.map(tools, fn(t) { #("tools", encode_tool_capabilities(t)) }),
+      option.map(logging, fn(l) { #("logging", encode_logging_capabilities(l)) }),
+      option.map(completions, fn(c) { #("completions", encode_completions(c)) }),
+    ]
+    |> option.values
 
-  // json.object(optional_fields)
+  json.object(optional_fields)
 }
 
 // Server capabilities decoder
@@ -1234,15 +1230,7 @@ fn server_capabilities_decoder() -> Decoder(ServerCapabilities) {
   use completions <- decode.optional_field(
     "completions",
     None,
-    decode.optional(decode.dict(decode.string, decode.dynamic)),
-  )
-  use experimental <- decode.optional_field(
-    "experimental",
-    None,
-    decode.optional(decode.dict(
-      decode.string,
-      decode.dict(decode.string, decode.dynamic),
-    )),
+    decode.optional(completions_decoder()),
   )
   decode.success(ServerCapabilities(
     resources: resources,
@@ -1250,7 +1238,6 @@ fn server_capabilities_decoder() -> Decoder(ServerCapabilities) {
     tools: tools,
     logging: logging,
     completions: completions,
-    experimental: experimental,
   ))
 }
 
@@ -1384,18 +1371,19 @@ fn encode_tool_input_schema(schema: ToolInputSchema) -> Json {
 }
 
 fn tool_input_schema_decoder() -> Decoder(ToolInputSchema) {
-  use type_ <- decode.field("type", decode.string)
-  use properties <- decode.optional_field(
-    "properties",
-    None,
-    decode.optional(decode.dict(decode.string, decode.dynamic)),
-  )
-  use required <- decode.optional_field(
-    "required",
-    None,
-    decode.optional(decode.list(decode.string)),
-  )
-  decode.success(ToolInputSchema(type_:, properties:, required:))
+  todo
+  // use type_ <- decode.field("type", decode.string)
+  // use properties <- decode.optional_field(
+  //   "properties",
+  //   None,
+  //   decode.optional(decode.dict(decode.string, decode.dynamic)),
+  // )
+  // use required <- decode.optional_field(
+  //   "required",
+  //   None,
+  //   decode.optional(decode.list(decode.string)),
+  // )
+  // decode.success(ToolInputSchema(type_:, properties:, required:))
 }
 
 // ToolAnnotations encoder and decoder
@@ -1884,55 +1872,56 @@ fn encode_create_message_params(params: CreateMessageParams) -> Json {
 }
 
 fn create_message_params_decoder() -> Decoder(CreateMessageParams) {
-  use messages <- decode.field(
-    "messages",
-    decode.list(sampling_message_decoder()),
-  )
-  use max_tokens <- decode.field("maxTokens", decode.int)
-  use temperature <- decode.optional_field(
-    "temperature",
-    None,
-    decode.optional(decode.float),
-  )
-  use stop_sequences <- decode.optional_field(
-    "stopSequences",
-    None,
-    decode.optional(decode.list(decode.string)),
-  )
-  use system_prompt <- decode.optional_field(
-    "systemPrompt",
-    None,
-    decode.optional(decode.string),
-  )
-  use model_preferences <- decode.optional_field(
-    "modelPreferences",
-    None,
-    decode.optional(model_preferences_decoder()),
-  )
-  use metadata <- decode.optional_field(
-    "metadata",
-    None,
-    decode.optional(decode.dict(decode.string, decode.dynamic)),
-  )
-  use include_context <- decode.optional_field(
-    "includeContext",
-    None,
-    decode.optional(decode.string),
-  )
-  decode.success(CreateMessageParams(
-    messages: messages,
-    max_tokens: max_tokens,
-    temperature: temperature,
-    stop_sequences: stop_sequences,
-    system_prompt: system_prompt,
-    model_preferences: model_preferences,
-    metadata: metadata,
-    include_context: include_context,
-  ))
+  todo
+  // use messages <- decode.field(
+  //   "messages",
+  //   decode.list(sampling_message_decoder()),
+  // )
+  // use max_tokens <- decode.field("maxTokens", decode.int)
+  // use temperature <- decode.optional_field(
+  //   "temperature",
+  //   None,
+  //   decode.optional(decode.float),
+  // )
+  // use stop_sequences <- decode.optional_field(
+  //   "stopSequences",
+  //   None,
+  //   decode.optional(decode.list(decode.string)),
+  // )
+  // use system_prompt <- decode.optional_field(
+  //   "systemPrompt",
+  //   None,
+  //   decode.optional(decode.string),
+  // )
+  // use model_preferences <- decode.optional_field(
+  //   "modelPreferences",
+  //   None,
+  //   decode.optional(model_preferences_decoder()),
+  // )
+  // use metadata <- decode.optional_field(
+  //   "metadata",
+  //   None,
+  //   decode.optional(decode.dict(decode.string, decode.dynamic)),
+  // )
+  // use include_context <- decode.optional_field(
+  //   "includeContext",
+  //   None,
+  //   decode.optional(decode.string),
+  // )
+  // decode.success(CreateMessageParams(
+  //   messages: messages,
+  //   max_tokens: max_tokens,
+  //   temperature: temperature,
+  //   stop_sequences: stop_sequences,
+  //   system_prompt: system_prompt,
+  //   model_preferences: model_preferences,
+  //   metadata: metadata,
+  //   include_context: include_context,
+  // ))
 }
 
 // CreateMessageResult encoder
-fn encode_create_message_result(result: CreateMessageResult) -> Json {
+pub fn encode_create_message_result(result: CreateMessageResult) -> Json {
   todo
   // let CreateMessageResult(content:, model:, role:, stop_reason:, meta:) = result
 
@@ -1954,64 +1943,51 @@ fn encode_create_message_result(result: CreateMessageResult) -> Json {
 }
 
 // ListRootsResult encoder
-fn encode_list_roots_result(result: ListRootsResult) -> Json {
-  todo
-  // let ListRootsResult(roots:, meta:) = result
+pub fn encode_list_roots_result(result: ListRootsResult) -> Json {
+  let ListRootsResult(roots:, meta:) = result
 
-  // let optional_fields =
-  //   [
-  //     option.map(meta, fn(m) {
-  //       #("meta", json.dict(m, fn(k) { k }, fn(v) { v }))
-  //     }),
-  //   ]
-  //   |> option.values
+  let optional_fields =
+    [option.map(meta, fn(m) { #("meta", encode_meta(m)) })]
+    |> option.values
 
-  // json.object([#("roots", json.array(roots, encode_root)), ..optional_fields])
+  json.object([#("roots", json.array(roots, encode_root)), ..optional_fields])
 }
 
 // ListResourceTemplatesResult encoder
-fn encode_list_resource_templates_result(
+pub fn encode_list_resource_templates_result(
   result: ListResourceTemplatesResult,
 ) -> Json {
-  todo
-  // let ListResourceTemplatesResult(resource_templates:, next_cursor:, meta:) =
-  //   result
+  let ListResourceTemplatesResult(resource_templates:, next_cursor:, meta:) =
+    result
 
-  // let optional_fields =
-  //   [
-  //     option.map(next_cursor, fn(c) { #("next_cursor", json.string(c)) }),
-  //     option.map(meta, fn(m) {
-  //       #("meta", json.dict(m, fn(k) { k }, fn(v) { v }))
-  //     }),
-  //   ]
-  //   |> option.values
+  let optional_fields =
+    [
+      option.map(next_cursor, fn(c) { #("next_cursor", json.string(c)) }),
+      option.map(meta, fn(m) { #("meta", encode_meta(m)) }),
+    ]
+    |> option.values
 
-  // json.object([
-  //   #(
-  //     "resource_templates",
-  //     json.array(resource_templates, encode_resource_template),
-  //   ),
-  //   ..optional_fields
-  // ])
+  json.object([
+    #(
+      "resource_templates",
+      json.array(resource_templates, encode_resource_template),
+    ),
+    ..optional_fields
+  ])
 }
 
 // CompleteResult encoder
-fn encode_complete_result(result: CompleteResult) -> Json {
-  todo
-  // let CompleteResult(completion:, meta:) = result
+pub fn encode_complete_result(result: CompleteResult) -> Json {
+  let CompleteResult(completion:, meta:) = result
 
-  // let optional_fields =
-  //   [
-  //     option.map(meta, fn(m) {
-  //       #("meta", json.dict(m, fn(k) { k }, fn(v) { v }))
-  //     }),
-  //   ]
-  //   |> option.values
+  let optional_fields =
+    [option.map(meta, fn(m) { #("meta", encode_meta(m)) })]
+    |> option.values
 
-  // json.object([
-  //   #("completion", encode_completion_info(completion)),
-  //   ..optional_fields
-  // ])
+  json.object([
+    #("completion", encode_completion_info(completion)),
+    ..optional_fields
+  ])
 }
 
 // REWRITE ENCODERS

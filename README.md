@@ -75,3 +75,5 @@ server.new()
 * pagination (it returns all resources, etc.)
 * resource templates (need a uri template lib)
 * server notifications (resources cannot change yet)
+* _meta field
+* experimental field

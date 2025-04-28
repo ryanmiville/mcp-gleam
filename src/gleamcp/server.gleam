@@ -34,7 +34,7 @@ pub fn new(name name: String, version version: String) -> Builder {
     resource_templates: dict.new(),
     tools: dict.new(),
     prompts: dict.new(),
-    capabilities: mcp.ServerCapabilities(None, None, None, None, None, None),
+    capabilities: mcp.ServerCapabilities(None, None, None, None, None),
     page_limit: None,
   )
 }
