@@ -180,7 +180,7 @@ pub type ServerCapabilities {
     resources: Option(ResourceCapabilities),
     prompts: Option(PromptCapabilities),
     tools: Option(ToolCapabilities),
-    logging: Option(Dict(String, Dynamic)),
+    logging: Option(LoggingCapabilities),
     completions: Option(Dict(String, Dynamic)),
     experimental: Option(Dict(String, Dict(String, Dynamic))),
   )
@@ -199,6 +199,10 @@ pub type PromptCapabilities {
 /// Tool capabilities of a server
 pub type ToolCapabilities {
   ToolCapabilities(list_changed: Bool)
+}
+
+pub type LoggingCapabilities {
+  LoggingCapabilities
 }
 
 /// Content types that can be sent or received

@@ -8,9 +8,6 @@ import jsonrpc
 
 import gleam/option.{type Option, None, Some}
 import gleamcp/mcp
-import gleamcp/prompt.{type Prompt}
-import gleamcp/resource.{type Resource, type ResourceTemplate}
-import gleamcp/tool.{type Tool}
 
 pub type Builder {
   Builder(
@@ -46,6 +43,10 @@ pub fn description(builder: Builder, description: String) -> Builder {
   Builder(..builder, description: Some(description))
 }
 
+pub fn instructions(builder: Builder, instructions: String) -> Builder {
+  Builder(..builder, instructions: Some(instructions))
+}
+
 pub fn add_resource(
   builder: Builder,
   resource: mcp.Resource,
@@ -64,7 +65,7 @@ pub fn add_resource(
     ..builder,
     resources: dict.insert(
       builder.resources,
-      resource.name,
+      resource.uri,
       ServerResource(resource, handler),
     ),
     capabilities:,
@@ -167,6 +168,15 @@ pub fn tool_capabilities(builder: Builder, list_changed: Bool) {
     mcp.ServerCapabilities(
       ..builder.capabilities,
       tools: Some(mcp.ToolCapabilities(list_changed)),
+    )
+  Builder(..builder, capabilities: capabilities)
+}
+
+pub fn enable_logging(builder: Builder) {
+  let capabilities =
+    mcp.ServerCapabilities(
+      ..builder.capabilities,
+      logging: Some(mcp.LoggingCapabilities),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -432,7 +442,7 @@ pub fn ping(
 
 pub fn list_resources(
   server: Server,
-  request: mcp.ListResourcesRequest,
+  _request: mcp.ListResourcesRequest,
 ) -> Result(mcp.ListResourcesResult, mcp.McpError) {
   let resources =
     dict.values(server.resources)
@@ -442,7 +452,7 @@ pub fn list_resources(
 
 pub fn list_resource_templates(
   server: Server,
-  request: mcp.ListResourceTemplatesRequest,
+  _request: mcp.ListResourceTemplatesRequest,
 ) -> Result(mcp.ListResourceTemplatesResult, mcp.McpError) {
   let resource_templates =
     dict.values(server.resource_templates)
@@ -458,12 +468,18 @@ pub fn read_resource(
   server: Server,
   request: mcp.ReadResourceRequest,
 ) -> Result(mcp.ReadResourceResult, mcp.McpError) {
-  todo
+  case dict.get(server.resources, request.uri) {
+    Ok(resource) -> {
+      let assert Ok(res) = resource.handler(request)
+      Ok(res)
+    }
+    Error(_) -> todo
+  }
 }
 
 pub fn list_prompts(
   server: Server,
-  request: mcp.ListPromptsRequest,
+  _request: mcp.ListPromptsRequest,
 ) -> Result(mcp.ListPromptsResult, mcp.McpError) {
   let prompts =
     dict.values(server.prompts)
@@ -475,12 +491,18 @@ pub fn get_prompt(
   server: Server,
   request: mcp.GetPromptRequest,
 ) -> Result(mcp.GetPromptResult, mcp.McpError) {
-  todo
+  case dict.get(server.prompts, request.name) {
+    Ok(prompt) -> {
+      let assert Ok(res) = prompt.handler(request)
+      Ok(res)
+    }
+    Error(_) -> todo
+  }
 }
 
 pub fn list_tools(
   server: Server,
-  request: mcp.ListToolsRequest,
+  _request: mcp.ListToolsRequest,
 ) -> Result(mcp.ListToolsResult, mcp.McpError) {
   let tools =
     dict.values(server.tools)
@@ -492,7 +514,13 @@ pub fn call_tool(
   server: Server,
   request: mcp.CallToolRequest,
 ) -> Result(mcp.CallToolResult, mcp.McpError) {
-  todo
+  case dict.get(server.tools, request.name) {
+    Ok(tool) -> {
+      let assert Ok(res) = tool.handler(request)
+      Ok(res)
+    }
+    Error(_) -> todo
+  }
 }
 // pub fn notification_resources_list_changed(
 //   server: Server,

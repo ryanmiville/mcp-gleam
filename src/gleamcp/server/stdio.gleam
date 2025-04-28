@@ -1,3 +1,20 @@
+import gleam/io
+import gleam/json
+import gleam/result
+import gleamcp/server
+
+pub fn server(server: server.Server) -> Result(Nil, Nil) {
+  serve_loop(server)
+}
+
+fn serve_loop(server) {
+  use msg <- result.try(read_message())
+  let result = server.handle_message(server, msg) |> result.replace_error(Nil)
+  use json <- result.try(result)
+  json |> json.to_string |> io.println
+  serve_loop(server)
+}
+
 pub fn read_message() -> Result(String, Nil) {
   case read_line() {
     Error(_) -> Error(Nil)
