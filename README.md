@@ -58,17 +58,22 @@ let res = resource.new("docs://readme", "Project README")
   |> resource.description("The project's README file")
   |> resource.mime_type("text/markdown")
 
-use req <- server.add_resource(srv, res)
-let content = simplifile.read_file("README.md")
-let res = resource.TextContents(
-  uri: "docs://readme",
-  mime_type: "text/markdown",
-  text: content,
-)
-[res]
+server.new()
+  |> server.add_resource(res, fn(req) {
+    let content = simplifile.read_file("README.md")
+    resource.TextContents(
+      uri: "docs://readme",
+      mime_type: "text/markdown",
+      text: content,
+    )
+  })
 ```
 
 ### Unsupported Features
 * batch messages
 * resource subscribe
+* pagination (it returns all resources, etc.)
+* resource templates (need a uri template lib)
 * server notifications (resources cannot change yet)
+* _meta field
+* experimental field
