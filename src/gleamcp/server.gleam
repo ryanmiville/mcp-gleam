@@ -8,9 +8,6 @@ import jsonrpc
 
 import gleam/option.{type Option, None, Some}
 import gleamcp/mcp
-import gleamcp/prompt.{type Prompt}
-import gleamcp/resource.{type Resource, type ResourceTemplate}
-import gleamcp/tool.{type Tool}
 
 pub type Builder {
   Builder(
