@@ -4,10 +4,10 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic/decode.{type Decoder, type Dynamic}
 import gleam/json.{type Json}
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option, None}
 import jsonrpc
 
-pub const protocol_version = "2025-03-26"
+pub const protocol_version = "2024-11-05"
 
 pub type McpError {
   UnexpectedJsonError(json.DecodeError)
@@ -25,7 +25,7 @@ pub type ContentType {
   ContentTypeResource
 }
 
-fn content_type_decoder() -> Decoder(ContentType) {
+pub fn content_type_decoder() -> Decoder(ContentType) {
   use variant <- decode.then(decode.string)
   case variant {
     "text" -> decode.success(ContentTypeText)
@@ -51,7 +51,7 @@ pub type Role {
   Assistant
 }
 
-fn role_decoder() -> Decoder(Role) {
+pub fn role_decoder() -> Decoder(Role) {
   use variant <- decode.then(decode.string)
   case variant {
     "user" -> decode.success(User)
@@ -67,13 +67,16 @@ fn encode_role(role: Role) -> Json {
   }
 }
 
+pub type Meta =
+  Dict(String, Dynamic)
+
 /// Used for tracking progress of operations
 pub type ProgressToken {
   ProgressTokenString(String)
   ProgressTokenInt(Int)
 }
 
-fn progress_token_decoder() -> Decoder(ProgressToken) {
+pub fn progress_token_decoder() -> Decoder(ProgressToken) {
   let string = decode.string |> decode.map(ProgressTokenString)
   let int = decode.int |> decode.map(ProgressTokenInt)
   decode.one_of(string, [int])
@@ -95,7 +98,7 @@ pub type LoggingLevel {
   Debug
 }
 
-fn encode_logging_level(logging_level: LoggingLevel) -> Json {
+pub fn encode_logging_level(logging_level: LoggingLevel) -> Json {
   case logging_level {
     Emergency -> json.string("emergency")
     Alert -> json.string("alert")
@@ -108,7 +111,7 @@ fn encode_logging_level(logging_level: LoggingLevel) -> Json {
   }
 }
 
-fn logging_level_decoder() -> Decoder(LoggingLevel) {
+pub fn logging_level_decoder() -> Decoder(LoggingLevel) {
   use variant <- decode.then(decode.string)
   case variant {
     "emergency" -> decode.success(Emergency)
@@ -139,7 +142,7 @@ fn encode_annotations(annotations: Annotations) -> Json {
   )
 }
 
-fn annotations_decoder() -> Decoder(Annotations) {
+pub fn annotations_decoder() -> Decoder(Annotations) {
   use audience <- decode.optional_field(
     "audience",
     None,
@@ -173,7 +176,7 @@ pub type Sampling {
   Sampling
 }
 
-fn encode_sampling(sampling: Sampling) -> Json {
+pub fn encode_sampling(_sampling: Sampling) -> Json {
   json.object([])
 }
 
@@ -195,13 +198,13 @@ pub type RootCapabilities {
   RootCapabilities(list_changed: Bool)
 }
 
-fn encode_root_capabilities(root_capabilities: RootCapabilities) -> Json {
+pub fn encode_root_capabilities(root_capabilities: RootCapabilities) -> Json {
   let RootCapabilities(list_changed:) = root_capabilities
-  json.object([#("list_changed", json.bool(list_changed))])
+  json.object([#("listChanged", json.bool(list_changed))])
 }
 
 fn root_capabilities_decoder() -> Decoder(RootCapabilities) {
-  use list_changed <- decode.field("list_changed", decode.bool)
+  use list_changed <- decode.field("listChanged", decode.bool)
   decode.success(RootCapabilities(list_changed:))
 }
 
@@ -209,11 +212,11 @@ pub type Completions {
   Completions
 }
 
-fn encode_completions(completions: Completions) -> Json {
+pub fn encode_completions(_completions: Completions) -> Json {
   json.object([])
 }
 
-fn completions_decoder() -> Decoder(Completions) {
+pub fn completions_decoder() -> Decoder(Completions) {
   decode.success(Completions)
 }
 
@@ -244,7 +247,7 @@ fn encode_resource_capabilities(
   ])
 }
 
-fn resource_capabilities_decoder() -> Decoder(ResourceCapabilities) {
+pub fn resource_capabilities_decoder() -> Decoder(ResourceCapabilities) {
   use list_changed <- decode.field("list_changed", decode.bool)
   use subscribe <- decode.field("subscribe", decode.bool)
   decode.success(ResourceCapabilities(list_changed:, subscribe:))
@@ -260,7 +263,7 @@ fn encode_prompt_capabilities(prompt_capabilities: PromptCapabilities) -> Json {
   json.object([#("list_changed", json.bool(list_changed))])
 }
 
-fn prompt_capabilities_decoder() -> Decoder(PromptCapabilities) {
+pub fn prompt_capabilities_decoder() -> Decoder(PromptCapabilities) {
   use list_changed <- decode.field("list_changed", decode.bool)
   decode.success(PromptCapabilities(list_changed:))
 }
@@ -275,7 +278,7 @@ fn encode_tool_capabilities(tool_capabilities: ToolCapabilities) -> Json {
   json.object([#("list_changed", json.bool(list_changed))])
 }
 
-fn tool_capabilities_decoder() -> Decoder(ToolCapabilities) {
+pub fn tool_capabilities_decoder() -> Decoder(ToolCapabilities) {
   use list_changed <- decode.field("list_changed", decode.bool)
   decode.success(ToolCapabilities(list_changed:))
 }
@@ -284,13 +287,13 @@ pub type LoggingCapabilities {
   LoggingCapabilities
 }
 
-fn encode_logging_capabilities(
-  logging_capabilities: LoggingCapabilities,
+pub fn encode_logging_capabilities(
+  _logging_capabilities: LoggingCapabilities,
 ) -> Json {
   json.object([])
 }
 
-fn logging_capabilities_decoder() -> Decoder(LoggingCapabilities) {
+pub fn logging_capabilities_decoder() -> Decoder(LoggingCapabilities) {
   decode.success(LoggingCapabilities)
 }
 
@@ -304,7 +307,7 @@ pub type TextContent {
   )
 }
 
-fn text_content_decoder() -> Decoder(TextContent) {
+pub fn text_content_decoder() -> Decoder(TextContent) {
   use type_ <- decode.field("type", content_type_decoder())
   use text <- decode.field("text", decode.string)
   use annotations <- decode.optional_field(
@@ -325,7 +328,7 @@ pub type ImageContent {
   )
 }
 
-fn image_content_decoder() -> Decoder(ImageContent) {
+pub fn image_content_decoder() -> Decoder(ImageContent) {
   use type_ <- decode.field("type", content_type_decoder())
   use data <- decode.field("data", decode.string)
   use mime_type <- decode.field("mimeType", decode.string)
@@ -347,7 +350,7 @@ pub type AudioContent {
   )
 }
 
-fn audio_content_decoder() -> Decoder(AudioContent) {
+pub fn audio_content_decoder() -> Decoder(AudioContent) {
   use type_ <- decode.field("type", content_type_decoder())
   use data <- decode.field("data", decode.string)
   use mime_type <- decode.field("mimeType", decode.string)
@@ -364,7 +367,7 @@ pub type TextResourceContents {
   TextResourceContents(uri: String, text: String, mime_type: Option(String))
 }
 
-fn text_resource_contents_decoder() -> Decoder(TextResourceContents) {
+pub fn text_resource_contents_decoder() -> Decoder(TextResourceContents) {
   use uri <- decode.field("uri", decode.string)
   use text <- decode.field("text", decode.string)
   use mime_type <- decode.optional_field(
@@ -380,7 +383,7 @@ pub type BlobResourceContents {
   BlobResourceContents(uri: String, blob: String, mime_type: Option(String))
 }
 
-fn blob_resource_contents_decoder() -> Decoder(BlobResourceContents) {
+pub fn blob_resource_contents_decoder() -> Decoder(BlobResourceContents) {
   use uri <- decode.field("uri", decode.string)
   use blob <- decode.field("blob", decode.string)
   use mime_type <- decode.optional_field(
@@ -400,7 +403,7 @@ pub type EmbeddedResource {
   )
 }
 
-fn embedded_resource_decoder() -> Decoder(EmbeddedResource) {
+pub fn embedded_resource_decoder() -> Decoder(EmbeddedResource) {
   use type_ <- decode.field("type", content_type_decoder())
   use resource <- decode.field("resource", resource_contents_decoder())
   use annotations <- decode.optional_field(
@@ -417,7 +420,7 @@ pub type ResourceContents {
   BlobResource(BlobResourceContents)
 }
 
-fn resource_contents_decoder() -> Decoder(ResourceContents) {
+pub fn resource_contents_decoder() -> Decoder(ResourceContents) {
   let text = text_resource_contents_decoder() |> decode.map(TextResource)
   let blob = blob_resource_contents_decoder() |> decode.map(BlobResource)
   decode.one_of(text, [blob])
@@ -442,14 +445,14 @@ pub type MessageContent {
   AudioMessageContent(AudioContent)
 }
 
-fn message_content_decoder() -> Decoder(MessageContent) {
+pub fn message_content_decoder() -> Decoder(MessageContent) {
   let text = text_content_decoder() |> decode.map(TextMessageContent)
   let image = image_content_decoder() |> decode.map(ImageMessageContent)
   let audio = audio_content_decoder() |> decode.map(AudioMessageContent)
   decode.one_of(text, [image, audio])
 }
 
-fn encode_message_content(message_content: MessageContent) {
+pub fn encode_message_content(message_content: MessageContent) {
   case message_content {
     AudioMessageContent(msg) -> encode_audio_content(msg)
     ImageMessageContent(msg) -> encode_image_content(msg)
@@ -470,7 +473,7 @@ fn encode_prompt_message(prompt_message: PromptMessage) -> Json {
   ])
 }
 
-fn prompt_message_decoder() -> Decoder(PromptMessage) {
+pub fn prompt_message_decoder() -> Decoder(PromptMessage) {
   use role <- decode.field("role", role_decoder())
   use content <- decode.field("content", prompt_message_content_decoder())
   decode.success(PromptMessage(role:, content:))
@@ -529,7 +532,7 @@ pub type Resource {
   )
 }
 
-fn decode_optional(
+pub fn decode_optional(
   name: name,
   decoder: Decoder(a),
   next: fn(Option(a)) -> Decoder(b),
@@ -537,11 +540,11 @@ fn decode_optional(
   decode.optional_field(name, None, decode.optional(decoder), next)
 }
 
-fn resource_decoder() -> Decoder(Resource) {
+pub fn resource_decoder() -> Decoder(Resource) {
   use name <- decode.field("name", decode.string)
   use uri <- decode.field("uri", decode.string)
   use description <- decode_optional("description", decode.string)
-  use mime_type <- decode_optional("mime_type", decode.string)
+  use mime_type <- decode_optional("mimeType", decode.string)
   use size <- decode_optional("size", decode.int)
   use annotations <- decode_optional("annotations", annotations_decoder())
 
@@ -555,13 +558,13 @@ fn resource_decoder() -> Decoder(Resource) {
   ))
 }
 
-fn encode_optional(
+pub fn encode_optional(
   name: String,
   value: Option(a),
   encode: fn(a) -> Json,
 ) -> Option(#(String, Json)) {
   use value <- option.map(value)
-  #("name", encode(value))
+  #(name, encode(value))
 }
 
 // Resource encoder and decoder
@@ -610,14 +613,17 @@ pub type Tool {
   )
 }
 
+pub type ToolInputSchema =
+  Json
+
 /// Schema for tool inputs
-pub type ToolInputSchema {
-  ToolInputSchema(
-    type_: String,
-    properties: Option(Dict(String, Dynamic)),
-    required: Option(List(String)),
-  )
-}
+// pub type ToolInputSchema {
+//   ToolInputSchema(
+//     type_: String,
+//     properties: Option(Dict(String, Dynamic)),
+//     required: Option(List(String)),
+//   )
+// }
 
 /// Annotations for tools
 pub type ToolAnnotations {
@@ -684,7 +690,7 @@ pub type Reference {
 
 /// Base result type for all responses
 pub type Result {
-  Result(meta: Option(Dict(String, Dynamic)))
+  Result(meta: Option(Meta))
 }
 
 pub type EmptyResult {
@@ -725,15 +731,15 @@ pub type InitializeResult {
     protocol_version: String,
     server_info: Implementation,
     instructions: Option(String),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
-fn meta_decoder() -> Decoder(Dict(String, Dynamic)) {
+pub fn meta_decoder() -> Decoder(Dict(String, Dynamic)) {
   decode.success(dict.new())
 }
 
-fn encode_meta(meta: Dict(String, Dynamic)) -> Json {
+pub fn encode_meta(_meta: Dict(String, Dynamic)) -> Json {
   json.object([])
 }
 
@@ -761,7 +767,20 @@ pub fn encode_initialize_result(initialize_result: InitializeResult) -> Json {
 
 /// Ping request for keepalive
 pub type PingRequest {
-  PingRequest
+  PingRequest(meta: Option(Meta))
+}
+
+pub fn encode_ping_request(ping_request: PingRequest) -> ToolInputSchema {
+  let PingRequest(meta:) = ping_request
+  let optional_fields =
+    [encode_optional("meta", meta, encode_meta)]
+    |> option.values
+  json.object(optional_fields)
+}
+
+pub fn ping_request_decoder() -> Decoder(PingRequest) {
+  use meta <- decode_optional("_meta", meta_decoder())
+  decode.success(PingRequest(meta:))
 }
 
 pub type ListRequest {
@@ -769,7 +788,7 @@ pub type ListRequest {
 }
 
 pub fn list_request_decoder() -> Decoder(ListRequest) {
-  use cursor <- decode.field("cursor", decode.optional(decode.string))
+  use cursor <- decode_optional("cursor", decode.string)
   decode.success(ListRequest(cursor:))
 }
 
@@ -798,7 +817,7 @@ pub type ListResourcesResult {
   ListResourcesResult(
     resources: List(Resource),
     next_cursor: Option(Cursor),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
@@ -828,7 +847,7 @@ pub type ListResourceTemplatesResult {
   ListResourceTemplatesResult(
     resource_templates: List(ResourceTemplate),
     next_cursor: Option(Cursor),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
@@ -844,10 +863,7 @@ pub fn read_resource_request_decoder() -> Decoder(ReadResourceRequest) {
 
 /// Read resource result
 pub type ReadResourceResult {
-  ReadResourceResult(
-    contents: List(ResourceContents),
-    meta: Option(Dict(String, Dynamic)),
-  )
+  ReadResourceResult(contents: List(ResourceContents), meta: Option(Meta))
 }
 
 pub fn encode_read_resource_result(
@@ -882,7 +898,7 @@ pub type ListPromptsResult {
   ListPromptsResult(
     prompts: List(Prompt),
     next_cursor: Option(Cursor),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
@@ -921,7 +937,7 @@ pub type GetPromptResult {
   GetPromptResult(
     messages: List(PromptMessage),
     description: Option(String),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
@@ -944,7 +960,7 @@ pub type ListToolsResult {
   ListToolsResult(
     tools: List(Tool),
     next_cursor: Option(Cursor),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
@@ -967,7 +983,7 @@ pub type CallToolResult {
   CallToolResult(
     content: List(ToolResultContent),
     is_error: Option(Bool),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
@@ -1006,10 +1022,7 @@ pub type ArgumentInfo {
 
 /// Complete result
 pub type CompleteResult {
-  CompleteResult(
-    completion: CompletionInfo,
-    meta: Option(Dict(String, Dynamic)),
-  )
+  CompleteResult(completion: CompletionInfo, meta: Option(Meta))
 }
 
 /// Completion information
@@ -1047,7 +1060,7 @@ pub type CreateMessageResult {
     model: String,
     role: Role,
     stop_reason: Option(String),
-    meta: Option(Dict(String, Dynamic)),
+    meta: Option(Meta),
   )
 }
 
@@ -1058,7 +1071,7 @@ pub type ListRootsRequest {
 
 /// List roots result
 pub type ListRootsResult {
-  ListRootsResult(roots: List(Root), meta: Option(Dict(String, Dynamic)))
+  ListRootsResult(roots: List(Root), meta: Option(Meta))
 }
 
 /// Notification types
@@ -1172,9 +1185,8 @@ fn client_capabilities_decoder() -> Decoder(ClientCapabilities) {
   ))
 }
 
-fn encode_client_capabilities(capabilities: ClientCapabilities) -> Json {
+pub fn encode_client_capabilities(capabilities: ClientCapabilities) -> Json {
   let ClientCapabilities(roots:, sampling:) = capabilities
-  todo
   let optional_fields =
     [
       option.map(roots, fn(r) { #("roots", encode_root_capabilities(r)) }),
@@ -1206,7 +1218,7 @@ fn encode_server_capabilities(capabilities: ServerCapabilities) -> Json {
 }
 
 // Server capabilities decoder
-fn server_capabilities_decoder() -> Decoder(ServerCapabilities) {
+pub fn server_capabilities_decoder() -> Decoder(ServerCapabilities) {
   use resources <- decode.optional_field(
     "resources",
     None,
@@ -1242,7 +1254,7 @@ fn server_capabilities_decoder() -> Decoder(ServerCapabilities) {
 }
 
 // SamplingMessage encoder and decoder
-fn encode_sampling_message(message: SamplingMessage) -> Json {
+pub fn encode_sampling_message(message: SamplingMessage) -> Json {
   let SamplingMessage(role:, content:) = message
   json.object([
     #("role", encode_role(role)),
@@ -1250,14 +1262,14 @@ fn encode_sampling_message(message: SamplingMessage) -> Json {
   ])
 }
 
-fn sampling_message_decoder() -> Decoder(SamplingMessage) {
+pub fn sampling_message_decoder() -> Decoder(SamplingMessage) {
   use role <- decode.field("role", role_decoder())
   use content <- decode.field("content", message_content_decoder())
   decode.success(SamplingMessage(role:, content:))
 }
 
 // ModelHint encoder and decoder
-fn encode_model_hint(hint: ModelHint) -> Json {
+pub fn encode_model_hint(hint: ModelHint) -> Json {
   let ModelHint(name:) = hint
   let optional_fields =
     [option.map(name, fn(n) { #("name", json.string(n)) })]
@@ -1266,7 +1278,7 @@ fn encode_model_hint(hint: ModelHint) -> Json {
   json.object(optional_fields)
 }
 
-fn model_hint_decoder() -> Decoder(ModelHint) {
+pub fn model_hint_decoder() -> Decoder(ModelHint) {
   use name <- decode.optional_field(
     "name",
     None,
@@ -1276,7 +1288,7 @@ fn model_hint_decoder() -> Decoder(ModelHint) {
 }
 
 // ModelPreferences encoder and decoder
-fn encode_model_preferences(preferences: ModelPreferences) -> Json {
+pub fn encode_model_preferences(preferences: ModelPreferences) -> Json {
   let ModelPreferences(
     speed_priority:,
     cost_priority:,
@@ -1298,7 +1310,7 @@ fn encode_model_preferences(preferences: ModelPreferences) -> Json {
   json.object(optional_fields)
 }
 
-fn model_preferences_decoder() -> Decoder(ModelPreferences) {
+pub fn model_preferences_decoder() -> Decoder(ModelPreferences) {
   use speed_priority <- decode.optional_field(
     "speedPriority",
     None,
@@ -1355,7 +1367,7 @@ fn prompt_argument_decoder() -> Decoder(PromptArgument) {
 
 // ToolInputSchema encoder and decoder
 fn encode_tool_input_schema(schema: ToolInputSchema) -> Json {
-  todo
+  schema
   // let ToolInputSchema(type_:, properties:, required:) = schema
 
   // let optional_fields =
@@ -1370,7 +1382,7 @@ fn encode_tool_input_schema(schema: ToolInputSchema) -> Json {
   // json.object([#("type", json.string(type_)), ..optional_fields])
 }
 
-fn tool_input_schema_decoder() -> Decoder(ToolInputSchema) {
+pub fn tool_input_schema_decoder() -> Decoder(ToolInputSchema) {
   todo
   // use type_ <- decode.field("type", decode.string)
   // use properties <- decode.optional_field(
@@ -1409,7 +1421,7 @@ fn encode_tool_annotations(annotations: ToolAnnotations) -> Json {
   json.object(optional_fields)
 }
 
-fn tool_annotations_decoder() -> Decoder(ToolAnnotations) {
+pub fn tool_annotations_decoder() -> Decoder(ToolAnnotations) {
   use title <- decode.optional_field(
     "title",
     None,
@@ -1464,7 +1476,7 @@ fn encode_tool(tool: Tool) -> Json {
   ])
 }
 
-fn tool_decoder() -> Decoder(Tool) {
+pub fn tool_decoder() -> Decoder(Tool) {
   use name <- decode.field("name", decode.string)
   use input_schema <- decode.field("inputSchema", tool_input_schema_decoder())
   use description <- decode.optional_field(
@@ -1486,38 +1498,38 @@ fn tool_decoder() -> Decoder(Tool) {
 }
 
 // PromptReference encoder and decoder
-fn encode_prompt_reference(reference: PromptReference) -> Json {
+pub fn encode_prompt_reference(reference: PromptReference) -> Json {
   let PromptReference(type_:, name:) = reference
   json.object([#("type", json.string(type_)), #("name", json.string(name))])
 }
 
-fn prompt_reference_decoder() -> Decoder(PromptReference) {
+pub fn prompt_reference_decoder() -> Decoder(PromptReference) {
   use type_ <- decode.field("type", decode.string)
   use name <- decode.field("name", decode.string)
   decode.success(PromptReference(type_:, name:))
 }
 
 // ResourceReference encoder and decoder
-fn encode_resource_reference(reference: ResourceReference) -> Json {
+pub fn encode_resource_reference(reference: ResourceReference) -> Json {
   let ResourceReference(type_:, uri:) = reference
   json.object([#("type", json.string(type_)), #("uri", json.string(uri))])
 }
 
-fn resource_reference_decoder() -> Decoder(ResourceReference) {
+pub fn resource_reference_decoder() -> Decoder(ResourceReference) {
   use type_ <- decode.field("type", decode.string)
   use uri <- decode.field("uri", decode.string)
   decode.success(ResourceReference(type_:, uri:))
 }
 
 // Reference encoder and decoder
-fn encode_reference(reference: Reference) -> Json {
+pub fn encode_reference(reference: Reference) -> Json {
   case reference {
     PromptRef(ref) -> encode_prompt_reference(ref)
     ResourceRef(ref) -> encode_resource_reference(ref)
   }
 }
 
-fn reference_decoder() -> Decoder(Reference) {
+pub fn reference_decoder() -> Decoder(Reference) {
   use type_ <- decode.field("type", decode.string)
   case type_ {
     "prompt" -> {
@@ -1542,7 +1554,7 @@ fn encode_tool_result_content(content: ToolResultContent) -> Json {
   }
 }
 
-fn tool_result_content_decoder() -> Decoder(ToolResultContent) {
+pub fn tool_result_content_decoder() -> Decoder(ToolResultContent) {
   use type_ <- decode.field("type", content_type_decoder())
   case type_ {
     ContentTypeText -> {
@@ -1617,7 +1629,7 @@ fn encode_resource_template(template: ResourceTemplate) -> Json {
   ])
 }
 
-fn resource_template_decoder() -> Decoder(ResourceTemplate) {
+pub fn resource_template_decoder() -> Decoder(ResourceTemplate) {
   use name <- decode.field("name", decode.string)
   use uri_template <- decode.field("uriTemplate", decode.string)
   use description <- decode.optional_field(
@@ -1655,7 +1667,7 @@ fn encode_root(root: Root) -> Json {
   json.object([#("uri", json.string(uri)), ..optional_fields])
 }
 
-fn root_decoder() -> Decoder(Root) {
+pub fn root_decoder() -> Decoder(Root) {
   use uri <- decode.field("uri", decode.string)
   use name <- decode.optional_field(
     "name",
@@ -1679,7 +1691,7 @@ fn encode_completion_info(info: CompletionInfo) -> Json {
   json.object([#("values", json.array(values, json.string)), ..optional_fields])
 }
 
-fn completion_info_decoder() -> Decoder(CompletionInfo) {
+pub fn completion_info_decoder() -> Decoder(CompletionInfo) {
   use values <- decode.field("values", decode.list(decode.string))
   use has_more <- decode.optional_field(
     "hasMore",
@@ -1691,19 +1703,19 @@ fn completion_info_decoder() -> Decoder(CompletionInfo) {
 }
 
 // ArgumentInfo encoder and decoder
-fn encode_argument_info(info: ArgumentInfo) -> Json {
+pub fn encode_argument_info(info: ArgumentInfo) -> Json {
   let ArgumentInfo(name:, value:) = info
   json.object([#("name", json.string(name)), #("value", json.string(value))])
 }
 
-fn argument_info_decoder() -> Decoder(ArgumentInfo) {
+pub fn argument_info_decoder() -> Decoder(ArgumentInfo) {
   use name <- decode.field("name", decode.string)
   use value <- decode.field("value", decode.string)
   decode.success(ArgumentInfo(name:, value:))
 }
 
 // CompleteParams encoder and decoder
-fn encode_complete_params(params: CompleteParams) -> Json {
+pub fn encode_complete_params(params: CompleteParams) -> Json {
   let CompleteParams(ref_:, argument:) = params
   json.object([
     #("ref", encode_reference(ref_)),
@@ -1711,21 +1723,21 @@ fn encode_complete_params(params: CompleteParams) -> Json {
   ])
 }
 
-fn complete_params_decoder() -> Decoder(CompleteParams) {
+pub fn complete_params_decoder() -> Decoder(CompleteParams) {
   use ref_ <- decode.field("ref", reference_decoder())
   use argument <- decode.field("argument", argument_info_decoder())
   decode.success(CompleteParams(ref_:, argument:))
 }
 
 // ProgressParams encoder and decoder
-fn encode_progress_token(token: ProgressToken) -> Json {
+pub fn encode_progress_token(token: ProgressToken) -> Json {
   case token {
     ProgressTokenString(s) -> json.string(s)
     ProgressTokenInt(i) -> json.int(i)
   }
 }
 
-fn encode_progress_params(params: ProgressParams) -> Json {
+pub fn encode_progress_params(params: ProgressParams) -> Json {
   let ProgressParams(progress_token:, progress:, total:, message:) = params
 
   let optional_fields =
@@ -1742,7 +1754,7 @@ fn encode_progress_params(params: ProgressParams) -> Json {
   ])
 }
 
-fn progress_params_decoder() -> Decoder(ProgressParams) {
+pub fn progress_params_decoder() -> Decoder(ProgressParams) {
   use progress_token <- decode.field("progressToken", progress_token_decoder())
   use progress <- decode.field("progress", decode.float)
   use total <- decode.optional_field(
@@ -1764,7 +1776,7 @@ fn progress_params_decoder() -> Decoder(ProgressParams) {
 }
 
 // CancelledParams encoder and decoder
-fn encode_cancelled_params(params: CancelledParams) -> Json {
+pub fn encode_cancelled_params(params: CancelledParams) -> Json {
   let CancelledParams(request_id:, reason:) = params
 
   let optional_fields =
@@ -1774,7 +1786,7 @@ fn encode_cancelled_params(params: CancelledParams) -> Json {
   json.object([#("requestId", jsonrpc.encode_id(request_id)), ..optional_fields])
 }
 
-fn cancelled_params_decoder() -> Decoder(CancelledParams) {
+pub fn cancelled_params_decoder() -> Decoder(CancelledParams) {
   use request_id <- decode.field("requestId", jsonrpc.id_decoder())
   use reason <- decode.optional_field(
     "reason",
@@ -1785,7 +1797,7 @@ fn cancelled_params_decoder() -> Decoder(CancelledParams) {
 }
 
 // LoggingMessageParams encoder and decoder
-fn encode_logging_message_params(params: LoggingMessageParams) -> Json {
+pub fn encode_logging_message_params(_params: LoggingMessageParams) -> Json {
   todo
   // let LoggingMessageParams(level:, data:, logger:) = params
 
@@ -1800,7 +1812,7 @@ fn encode_logging_message_params(params: LoggingMessageParams) -> Json {
   // ])
 }
 
-fn logging_message_params_decoder() -> Decoder(LoggingMessageParams) {
+pub fn logging_message_params_decoder() -> Decoder(LoggingMessageParams) {
   use level <- decode.field("level", logging_level_decoder())
   use data <- decode.field("data", decode.dynamic)
   use logger <- decode.optional_field(
@@ -1812,29 +1824,29 @@ fn logging_message_params_decoder() -> Decoder(LoggingMessageParams) {
 }
 
 // SetLevelParams encoder and decoder
-fn encode_set_level_params(params: SetLevelParams) -> Json {
+pub fn encode_set_level_params(params: SetLevelParams) -> Json {
   let SetLevelParams(level:) = params
   json.object([#("level", encode_logging_level(level))])
 }
 
-fn set_level_params_decoder() -> Decoder(SetLevelParams) {
+pub fn set_level_params_decoder() -> Decoder(SetLevelParams) {
   use level <- decode.field("level", logging_level_decoder())
   decode.success(SetLevelParams(level:))
 }
 
 // ResourceURIParams encoder and decoder
-fn encode_resource_uri_params(params: ResourceURIParams) -> Json {
+pub fn encode_resource_uri_params(params: ResourceURIParams) -> Json {
   let ResourceURIParams(uri:) = params
   json.object([#("uri", json.string(uri))])
 }
 
-fn resource_uri_params_decoder() -> Decoder(ResourceURIParams) {
+pub fn resource_uri_params_decoder() -> Decoder(ResourceURIParams) {
   use uri <- decode.field("uri", decode.string)
   decode.success(ResourceURIParams(uri:))
 }
 
 // CreateMessageParams encoder and decoder
-fn encode_create_message_params(params: CreateMessageParams) -> Json {
+pub fn encode_create_message_params(params: CreateMessageParams) -> Json {
   todo
   // let CreateMessageParams(
   //   messages:,
@@ -1871,7 +1883,7 @@ fn encode_create_message_params(params: CreateMessageParams) -> Json {
   // ])
 }
 
-fn create_message_params_decoder() -> Decoder(CreateMessageParams) {
+pub fn create_message_params_decoder() -> Decoder(CreateMessageParams) {
   todo
   // use messages <- decode.field(
   //   "messages",

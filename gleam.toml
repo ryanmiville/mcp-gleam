@@ -19,6 +19,7 @@ gleam_json = ">= 2.3.0 and < 3.0.0"
 jsonrpc = { git = "https://github.com/ryanmiville/jsonrpc.git", ref = "main" }
 json_typedef = ">= 1.1.2 and < 2.0.0"
 simplifile = ">= 2.2.1 and < 3.0.0"
+argv = ">= 1.0.2 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

@@ -280,14 +280,15 @@ fn handle_request(
     m if m == method.ping -> {
       case request.params {
         None ->
-          ping(server, mcp.PingRequest)
+          ping(server, mcp.PingRequest(None))
           |> result.map(jsonrpc.response(_, request.id))
           |> result.map(jsonrpc.encode_response(_, mcp.encode_empty_result))
-        _ ->
-          jsonrpc.invalid_params
-          |> jsonrpc.error_response(request.id)
-          |> jsonrpc.encode_error_response(jsonrpc.encode_nothing)
-          |> Ok
+        Some(params) ->
+          decode.run(params, mcp.ping_request_decoder())
+          |> result.map_error(mcp.DecodeError)
+          |> result.try(ping(server, _))
+          |> result.map(jsonrpc.response(_, request.id))
+          |> result.map(jsonrpc.encode_response(_, mcp.encode_empty_result))
       }
     }
 
