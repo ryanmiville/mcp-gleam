@@ -1783,7 +1783,10 @@ pub fn encode_cancelled_params(params: CancelledParams) -> Json {
     [option.map(reason, fn(r) { #("reason", json.string(r)) })]
     |> option.values
 
-  json.object([#("requestId", jsonrpc.encode_id(request_id)), ..optional_fields])
+  json.object([
+    #("requestId", jsonrpc.id_to_json(request_id)),
+    ..optional_fields
+  ])
 }
 
 pub fn cancelled_params_decoder() -> Decoder(CancelledParams) {

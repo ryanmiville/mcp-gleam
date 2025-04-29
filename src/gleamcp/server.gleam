@@ -282,13 +282,13 @@ fn handle_request(
         None ->
           ping(server, mcp.PingRequest(None))
           |> result.map(jsonrpc.response(_, request.id))
-          |> result.map(jsonrpc.encode_response(_, mcp.encode_empty_result))
+          |> result.map(jsonrpc.response_to_json(_, mcp.encode_empty_result))
         Some(params) ->
           decode.run(params, mcp.ping_request_decoder())
           |> result.map_error(mcp.DecodeError)
           |> result.try(ping(server, _))
           |> result.map(jsonrpc.response(_, request.id))
-          |> result.map(jsonrpc.encode_response(_, mcp.encode_empty_result))
+          |> result.map(jsonrpc.response_to_json(_, mcp.encode_empty_result))
       }
     }
 
@@ -360,7 +360,7 @@ fn handle_request(
     _ ->
       jsonrpc.method_not_found
       |> jsonrpc.error_response(request.id)
-      |> jsonrpc.encode_error_response(jsonrpc.encode_nothing)
+      |> jsonrpc.error_response_to_json(jsonrpc.nothing_to_json)
       |> Ok
   }
 }
@@ -376,14 +376,14 @@ fn require_params(
     None ->
       jsonrpc.invalid_params
       |> jsonrpc.error_response(request.id)
-      |> jsonrpc.encode_error_response(jsonrpc.encode_nothing)
+      |> jsonrpc.error_response_to_json(jsonrpc.nothing_to_json)
       |> Ok
     Some(params) ->
       decode.run(params, params_decoder)
       |> result.map_error(mcp.DecodeError)
       |> result.try(handler(server, _))
       |> result.map(jsonrpc.response(_, request.id))
-      |> result.map(jsonrpc.encode_response(_, result_encoder))
+      |> result.map(jsonrpc.response_to_json(_, result_encoder))
   }
 }
 
@@ -397,14 +397,14 @@ fn paginated_params(
     None ->
       handler(server, mcp.ListRequest(None))
       |> result.map(jsonrpc.response(_, request.id))
-      |> result.map(jsonrpc.encode_response(_, encoder))
+      |> result.map(jsonrpc.response_to_json(_, encoder))
 
     Some(params) ->
       decode.run(params, mcp.list_request_decoder())
       |> result.map_error(mcp.DecodeError)
       |> result.try(handler(server, _))
       |> result.map(jsonrpc.response(_, request.id))
-      |> result.map(jsonrpc.encode_response(_, encoder))
+      |> result.map(jsonrpc.response_to_json(_, encoder))
   }
 }
 
