@@ -770,7 +770,7 @@ pub type PingRequest {
   PingRequest(meta: Option(Meta))
 }
 
-pub fn encode_ping_request(ping_request: PingRequest) -> ToolInputSchema {
+pub fn encode_ping_request(ping_request: PingRequest) -> Json {
   let PingRequest(meta:) = ping_request
   let optional_fields =
     [encode_optional("meta", meta, encode_meta)]
@@ -2119,3 +2119,14 @@ pub fn encode_call_tool_result(call_tool_result: CallToolResult) -> Json {
     ..optional_fields
   ])
 }
+// fn omittable(
+//   object: List(#(String, json.Json)),
+//   key: String,
+//   value: option.Option(a),
+//   to_json: fn(a) -> json.Json,
+// ) -> List(#(String, json.Json)) {
+//   case value {
+//     option.Some(value) -> [#(key, to_json(value)), ..object]
+//     option.None -> object
+//   }
+// }
