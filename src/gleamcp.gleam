@@ -1,9 +1,11 @@
 import argv
+import gleam/dynamic/decode
 import gleam/io
 import gleam/json
 import gleam/option.{None, Some}
 import gleam/result
-import gleamcp/mcp
+import gleam/string
+import gleamcp/spec as mcp
 
 import gleamcp/server
 import gleamcp/server/stdio
@@ -13,7 +15,7 @@ pub fn main() {
     server.new("test", "1.0.0")
     |> server.add_prompt(prompt(), prompt_handler)
     |> server.add_resource(resource(), resource_handler)
-    |> server.add_tool(tool(), tool_handler)
+    |> server.add_tool(tool(), get_weather_decoder(), tool_handler)
     |> server.build
 
   case argv.load().arguments {
@@ -46,7 +48,7 @@ fn print(server) {
 }
 
 fn prompt() {
-  mcp.Prompt(name: "test", description: Some("this is a test"), arguments: [])
+  mcp.Prompt(name: "test", description: Some("this is a test"), arguments: None)
 }
 
 fn prompt_handler(_request) {
@@ -55,7 +57,8 @@ fn prompt_handler(_request) {
       mcp.PromptMessage(
         role: mcp.User,
         content: mcp.TextPromptContent(mcp.TextContent(
-          type_: mcp.ContentTypeText,
+          type_: "text",
+          // type_: mcp.ContentTypeText,
           text: "this is a prompt message",
           annotations: None,
         )),
@@ -92,25 +95,34 @@ fn resource_handler(_request) {
   |> Ok
 }
 
+pub type GetWeather {
+  GetWeather(location: String)
+}
+
+fn get_weather_decoder() -> decode.Decoder(GetWeather) {
+  use location <- decode.field("location", decode.string)
+  decode.success(GetWeather(location:))
+}
+
 fn tool() -> mcp.Tool {
+  let assert Ok(schema) =
+    "{
+    'type': 'object',
+    'properties': {
+      'location': {
+        'type': 'string',
+        'description': 'City name or zip code'
+      }
+    },
+    'required': ['location']
+  }
+  "
+    |> string.replace("'", "\"")
+    |> mcp.tool_input_schema
+
   mcp.Tool(
     name: "get_weather",
-    input_schema: json.object([
-      #("type", json.string("object")),
-      #(
-        "properties",
-        json.object([
-          #(
-            "location",
-            json.object([
-              #("type", json.string("string")),
-              #("description", json.string("City name or zip code")),
-            ]),
-          ),
-        ]),
-      ),
-      #("required", json.array(["location"], json.string)),
-    ]),
+    input_schema: schema,
     description: Some("Get current weather information for a location"),
     annotations: None,
   )
@@ -120,7 +132,8 @@ fn tool_handler(_request) {
   mcp.CallToolResult(
     content: [
       mcp.TextToolContent(mcp.TextContent(
-        type_: mcp.ContentTypeText,
+        type_: "text",
+        // type_: mcp.ContentTypeText,
         text: "Current weather in New York:\nTemperature: 72°F\nConditions: Partly cloudy",
         annotations: None,
       )),

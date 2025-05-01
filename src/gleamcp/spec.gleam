@@ -4,8 +4,11 @@ import gleam/dynamic/decode.{type Decoder}
 import gleam/function
 import gleam/json.{type Json}
 import gleam/option.{type Option}
+import gleam/result
 import gleamcp/json_schema
 import jsonrpc
+
+pub const protocol_version = "2024-11-05"
 
 pub type Annotations {
   Annotations(audience: Option(List(Role)), priority: Option(Float))
@@ -1225,6 +1228,18 @@ pub fn ping_request_to_json(ping_request: PingRequest) -> Json {
   [] |> omittable_to_json("_meta", meta, meta_to_json) |> json.object
 }
 
+pub type PingResult {
+  PingResult
+}
+
+pub fn ping_result_decoder() -> Decoder(PingResult) {
+  decode.success(PingResult)
+}
+
+pub fn ping_result_to_json(_ping_result: PingResult) -> Json {
+  json.object([])
+}
+
 // pub type ProgressNotification {
 //   ProgressNotification(method: String, params: ProgressNotificationParams)
 // }
@@ -1986,27 +2001,45 @@ pub fn tool_annotations_to_json(tool_annotations: ToolAnnotations) -> Json {
   |> json.object
 }
 
-pub type ToolInputSchema =
-  json_schema.ObjectSchema
+pub opaque type ToolInputSchema {
+  ToolInputSchema(json_schema.ObjectSchema)
+}
+
+pub fn tool_input_schema(
+  json: String,
+) -> Result(ToolInputSchema, json.DecodeError) {
+  json.parse(json, tool_input_schema_decoder())
+}
 
 pub fn tool_input_schema_decoder() -> Decoder(ToolInputSchema) {
   let default =
-    json_schema.ObjectSchema(
-      properties: [],
-      required: [],
-      additional_properties: option.None,
-      pattern_properties: [],
+    ToolInputSchema(
+      json_schema.ObjectSchema(
+        properties: [],
+        required: [],
+        additional_properties: option.None,
+        pattern_properties: [],
+      ),
     )
   decode.new_primitive_decoder("ToolInputSchema", fn(data) {
-    case json_schema.decode_object_schema(data) {
-      Ok(schema) -> Ok(schema)
-      gleam.Error(_) -> gleam.Error(default)
+    case decode.run(data, decode.at(["type"], decode.string)) {
+      Ok("object") ->
+        case json_schema.decode_object_schema(data) {
+          Ok(schema) -> Ok(ToolInputSchema(schema))
+          gleam.Error(_) -> gleam.Error(default)
+        }
+      _ -> gleam.Error(default)
     }
   })
 }
 
 pub fn tool_input_schema_to_json(schema: ToolInputSchema) -> Json {
-  json_schema.object_schema_to_json(schema)
+  let ToolInputSchema(schema) = schema
+
+  [
+    #("type", json.string("object")),
+    ..json_schema.object_schema_to_json(schema)
+  ]
   |> json.object
 }
 

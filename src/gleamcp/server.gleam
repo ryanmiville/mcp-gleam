@@ -1,5 +1,5 @@
 import gleam/dict.{type Dict}
-import gleam/dynamic/decode.{type Dynamic}
+import gleam/dynamic/decode.{type Decoder, type Dynamic}
 import gleam/json
 import gleam/list
 import gleam/result
@@ -7,7 +7,9 @@ import gleamcp/method
 import jsonrpc
 
 import gleam/option.{type Option, None, Some}
-import gleamcp/mcp
+
+// import gleamcp/mcp
+import gleamcp/spec as mcp
 
 pub type Builder {
   Builder(
@@ -56,7 +58,10 @@ pub fn add_resource(
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        resources: Some(mcp.ResourceCapabilities(False, False)),
+        resources: Some(mcp.ServerCapabilitiesResources(
+          Some(False),
+          Some(False),
+        )),
       )
     Some(_) -> builder.capabilities
   }
@@ -81,7 +86,10 @@ pub fn add_resource_template(
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        resources: Some(mcp.ResourceCapabilities(False, False)),
+        resources: Some(mcp.ServerCapabilitiesResources(
+          Some(False),
+          Some(False),
+        )),
       )
     Some(_) -> builder.capabilities
   }
@@ -100,21 +108,44 @@ pub fn add_resource_template(
 pub fn add_tool(
   builder: Builder,
   tool: mcp.Tool,
-  handler: fn(mcp.CallToolRequest) -> Result(mcp.CallToolResult, Nil),
+  arguments_decoder: Decoder(arguments),
+  handler: fn(mcp.CallToolRequest(arguments)) -> Result(mcp.CallToolResult, Nil),
 ) -> Builder {
   let capabilities = case builder.capabilities.tools {
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        tools: Some(mcp.ToolCapabilities(False)),
+        tools: Some(mcp.ServerCapabilitiesTools(None)),
       )
     Some(_) -> builder.capabilities
   }
   Builder(
     ..builder,
-    tools: dict.insert(builder.tools, tool.name, ServerTool(tool, handler)),
+    tools: dict.insert(
+      builder.tools,
+      tool.name,
+      ServerTool(tool, prompt_handler(arguments_decoder, handler)),
+    ),
     capabilities:,
   )
+}
+
+fn prompt_handler(
+  arguments_decoder: Decoder(arguments),
+  handler: fn(mcp.CallToolRequest(arguments)) -> Result(mcp.CallToolResult, Nil),
+) -> fn(mcp.CallToolRequest(Dynamic)) -> Result(mcp.CallToolResult, Nil) {
+  fn(request: mcp.CallToolRequest(Dynamic)) {
+    case request.arguments {
+      None -> mcp.CallToolRequest(..request, arguments: None) |> handler
+      Some(dyn) ->
+        case decode.run(dyn, arguments_decoder) {
+          // TODO handle this
+          Error(_) -> Error(Nil)
+          Ok(args) ->
+            mcp.CallToolRequest(..request, arguments: Some(args)) |> handler
+        }
+    }
+  }
 }
 
 pub fn add_prompt(
@@ -126,7 +157,7 @@ pub fn add_prompt(
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        prompts: Some(mcp.PromptCapabilities(False)),
+        prompts: Some(mcp.ServerCapabilitiesPrompts(None)),
       )
     Some(_) -> builder.capabilities
   }
@@ -149,7 +180,10 @@ pub fn resource_capabilities(
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      resources: Some(mcp.ResourceCapabilities(subscribe, list_changed)),
+      resources: Some(mcp.ServerCapabilitiesResources(
+        Some(subscribe),
+        Some(list_changed),
+      )),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -158,7 +192,7 @@ pub fn prompt_capabilities(builder: Builder, list_changed: Bool) {
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      prompts: Some(mcp.PromptCapabilities(list_changed)),
+      prompts: Some(mcp.ServerCapabilitiesPrompts(Some(list_changed))),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -167,7 +201,7 @@ pub fn tool_capabilities(builder: Builder, list_changed: Bool) {
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      tools: Some(mcp.ToolCapabilities(list_changed)),
+      tools: Some(mcp.ServerCapabilitiesTools(Some(list_changed))),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -176,7 +210,7 @@ pub fn enable_logging(builder: Builder) {
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      logging: Some(mcp.LoggingCapabilities),
+      logging: Some(mcp.ServerCapabilitiesLogging),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -239,7 +273,7 @@ pub opaque type ServerResourceTemplate {
 pub opaque type ServerTool {
   ServerTool(
     tool: mcp.Tool,
-    handler: fn(mcp.CallToolRequest) -> Result(mcp.CallToolResult, Nil),
+    handler: fn(mcp.CallToolRequest(Dynamic)) -> Result(mcp.CallToolResult, Nil),
   )
 }
 
@@ -281,7 +315,7 @@ fn handle_request(
         request,
         initialize,
         mcp.initialize_request_decoder(),
-        mcp.encode_initialize_result,
+        mcp.initialize_result_to_json,
       )
     }
 
@@ -289,14 +323,13 @@ fn handle_request(
       case request.params {
         None ->
           ping(server, mcp.PingRequest(None))
-          |> result.map(jsonrpc.response(_, request.id))
-          |> result.map(jsonrpc.response_to_json(_, mcp.encode_empty_result))
+          |> result.map(mcp.ping_result_to_json)
         Some(params) ->
           decode.run(params, mcp.ping_request_decoder())
           |> decode_errors_json(request.id)
           |> result.try(ping(server, _))
           |> result.map(jsonrpc.response(_, request.id))
-          |> result.map(jsonrpc.response_to_json(_, mcp.encode_empty_result))
+          |> result.map(jsonrpc.response_to_json(_, mcp.ping_result_to_json))
       }
     }
 
@@ -305,7 +338,7 @@ fn handle_request(
         server,
         request,
         list_resources,
-        mcp.encode_list_resources_result,
+        mcp.list_resources_result_to_json,
       )
     }
 
@@ -315,7 +348,7 @@ fn handle_request(
         request,
         read_resource,
         mcp.read_resource_request_decoder(),
-        mcp.encode_read_resource_result,
+        mcp.read_resource_result_to_json,
       )
     }
 
@@ -324,7 +357,7 @@ fn handle_request(
         server,
         request,
         list_resource_templates,
-        mcp.encode_list_resource_templates_result,
+        mcp.list_resource_templates_result_to_json,
       )
     }
 
@@ -333,7 +366,7 @@ fn handle_request(
         server,
         request,
         list_prompts,
-        mcp.encode_list_prompts_result,
+        mcp.list_prompts_result_to_json,
       )
     }
 
@@ -343,7 +376,7 @@ fn handle_request(
         request,
         get_prompt,
         mcp.get_prompt_request_decoder(),
-        mcp.encode_get_prompt_result,
+        mcp.get_prompt_result_to_json,
       )
     }
 
@@ -352,7 +385,7 @@ fn handle_request(
         server,
         request,
         list_tools,
-        mcp.encode_list_tools_result,
+        mcp.list_tools_result_to_json,
       )
     }
 
@@ -361,8 +394,8 @@ fn handle_request(
         server,
         request,
         call_tool,
-        mcp.call_tool_request_decoder(),
-        mcp.encode_call_tool_result,
+        mcp.call_tool_request_decoder(decode.dynamic),
+        mcp.call_tool_result_to_json,
       )
     }
     _ ->
@@ -445,8 +478,8 @@ pub fn initialize(
 pub fn ping(
   _server: Server,
   _request: mcp.PingRequest,
-) -> Result(mcp.EmptyResult, json.Json) {
-  Ok(mcp.EmptyResult)
+) -> Result(mcp.PingResult, json.Json) {
+  Ok(mcp.PingResult)
 }
 
 pub fn list_resources(
@@ -533,7 +566,7 @@ pub fn list_tools(
 
 pub fn call_tool(
   server: Server,
-  request: mcp.CallToolRequest,
+  request: mcp.CallToolRequest(Dynamic),
 ) -> Result(mcp.CallToolResult, json.Json) {
   case dict.get(server.tools, request.name) {
     Ok(tool) -> {
