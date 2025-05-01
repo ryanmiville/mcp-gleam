@@ -1977,14 +1977,14 @@ pub fn encode_list_resource_templates_result(
 
   let optional_fields =
     [
-      option.map(next_cursor, fn(c) { #("next_cursor", json.string(c)) }),
-      option.map(meta, fn(m) { #("meta", encode_meta(m)) }),
+      option.map(next_cursor, fn(c) { #("nextCursor", json.string(c)) }),
+      option.map(meta, fn(m) { #("_meta", encode_meta(m)) }),
     ]
     |> option.values
 
   json.object([
     #(
-      "resource_templates",
+      "resourceTemplates",
       json.array(resource_templates, encode_resource_template),
     ),
     ..optional_fields

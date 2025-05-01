@@ -246,26 +246,34 @@ pub opaque type ServerTool {
 pub fn handle_message(
   server: Server,
   message: String,
-) -> Result(json.Json, mcp.McpError) {
+) -> Result(Option(json.Json), json.Json) {
   let result =
     json.parse(message, jsonrpc.message_decoder())
-    |> result.map_error(mcp.UnexpectedJsonError)
+    |> result.map_error(jsonrpc.json_error)
+    |> result.map_error(jsonrpc.error_response(_, jsonrpc.NullId))
+    |> result.map_error(jsonrpc.error_response_to_json(
+      _,
+      jsonrpc.nothing_to_json,
+    ))
 
   use msg <- result.try(result)
   case msg {
-    jsonrpc.RequestMessage(request) -> handle_request(server, request)
+    jsonrpc.RequestMessage(request) ->
+      handle_request(server, request) |> result.map(Some)
 
-    jsonrpc.NotificationMessage(notification) ->
-      handle_notification(server, notification)
+    jsonrpc.NotificationMessage(notification) -> {
+      let _ = handle_notification(server, notification)
+      Ok(None)
+    }
 
-    _ -> Error(mcp.ReceivedResponse)
+    _ -> Ok(None)
   }
 }
 
 fn handle_request(
   server: Server,
   request: jsonrpc.Request(Dynamic),
-) -> Result(json.Json, mcp.McpError) {
+) -> Result(json.Json, json.Json) {
   case request.method {
     m if m == method.initialize -> {
       require_params(
@@ -285,7 +293,7 @@ fn handle_request(
           |> result.map(jsonrpc.response_to_json(_, mcp.encode_empty_result))
         Some(params) ->
           decode.run(params, mcp.ping_request_decoder())
-          |> result.map_error(mcp.DecodeError)
+          |> decode_errors_json(request.id)
           |> result.try(ping(server, _))
           |> result.map(jsonrpc.response(_, request.id))
           |> result.map(jsonrpc.response_to_json(_, mcp.encode_empty_result))
@@ -315,8 +323,8 @@ fn handle_request(
       paginated_params(
         server,
         request,
-        list_resources,
-        mcp.encode_list_resources_result,
+        list_resource_templates,
+        mcp.encode_list_resource_templates_result,
       )
     }
 
@@ -368,19 +376,19 @@ fn handle_request(
 fn require_params(
   server: Server,
   request: jsonrpc.Request(Dynamic),
-  handler: fn(Server, a) -> Result(b, mcp.McpError),
+  handler: fn(Server, a) -> Result(b, json.Json),
   params_decoder: decode.Decoder(a),
   result_encoder: fn(b) -> json.Json,
-) -> Result(json.Json, mcp.McpError) {
+) -> Result(json.Json, json.Json) {
   case request.params {
     None ->
       jsonrpc.invalid_params
       |> jsonrpc.error_response(request.id)
       |> jsonrpc.error_response_to_json(jsonrpc.nothing_to_json)
-      |> Ok
+      |> Error
     Some(params) ->
       decode.run(params, params_decoder)
-      |> result.map_error(mcp.DecodeError)
+      |> decode_errors_json(request.id)
       |> result.try(handler(server, _))
       |> result.map(jsonrpc.response(_, request.id))
       |> result.map(jsonrpc.response_to_json(_, result_encoder))
@@ -390,9 +398,9 @@ fn require_params(
 fn paginated_params(
   server: Server,
   request: jsonrpc.Request(Dynamic),
-  handler: fn(Server, mcp.ListRequest) -> Result(a, mcp.McpError),
+  handler: fn(Server, mcp.ListRequest) -> Result(a, json.Json),
   encoder: fn(a) -> json.Json,
-) -> Result(json.Json, mcp.McpError) {
+) -> Result(json.Json, json.Json) {
   case request.params {
     None ->
       handler(server, mcp.ListRequest(None))
@@ -401,7 +409,7 @@ fn paginated_params(
 
     Some(params) ->
       decode.run(params, mcp.list_request_decoder())
-      |> result.map_error(mcp.DecodeError)
+      |> decode_errors_json(request.id)
       |> result.try(handler(server, _))
       |> result.map(jsonrpc.response(_, request.id))
       |> result.map(jsonrpc.response_to_json(_, encoder))
@@ -411,20 +419,20 @@ fn paginated_params(
 fn handle_notification(
   _server: Server,
   notification: jsonrpc.Notification(Dynamic),
-) -> Result(json.Json, mcp.McpError) {
+) -> Nil {
   case notification.method {
     // m if m == method.notification_resources_list_changed -> todo
     // m if m == method.notification_resource_updated -> todo
     // m if m == method.notification_prompts_list_changed -> todo
     // m if m == method.notification_tools_list_changed -> todo
-    _ -> Error(mcp.UnsupportedNotification(notification.method))
+    _ -> Nil
   }
 }
 
 pub fn initialize(
   server: Server,
   _request: mcp.InitializeRequest,
-) -> Result(mcp.InitializeResult, mcp.McpError) {
+) -> Result(mcp.InitializeResult, json.Json) {
   Ok(mcp.InitializeResult(
     capabilities: server.capabilities,
     protocol_version: mcp.protocol_version,
@@ -437,14 +445,14 @@ pub fn initialize(
 pub fn ping(
   _server: Server,
   _request: mcp.PingRequest,
-) -> Result(mcp.EmptyResult, mcp.McpError) {
+) -> Result(mcp.EmptyResult, json.Json) {
   Ok(mcp.EmptyResult)
 }
 
 pub fn list_resources(
   server: Server,
   _request: mcp.ListResourcesRequest,
-) -> Result(mcp.ListResourcesResult, mcp.McpError) {
+) -> Result(mcp.ListResourcesResult, json.Json) {
   let resources =
     dict.values(server.resources)
     |> list.map(fn(r) { r.resource })
@@ -454,7 +462,7 @@ pub fn list_resources(
 pub fn list_resource_templates(
   server: Server,
   _request: mcp.ListResourceTemplatesRequest,
-) -> Result(mcp.ListResourceTemplatesResult, mcp.McpError) {
+) -> Result(mcp.ListResourceTemplatesResult, json.Json) {
   let resource_templates =
     dict.values(server.resource_templates)
     |> list.map(fn(r) { r.template })
@@ -468,20 +476,26 @@ pub fn list_resource_templates(
 pub fn read_resource(
   server: Server,
   request: mcp.ReadResourceRequest,
-) -> Result(mcp.ReadResourceResult, mcp.McpError) {
+) -> Result(mcp.ReadResourceResult, json.Json) {
   case dict.get(server.resources, request.uri) {
     Ok(resource) -> {
       let assert Ok(res) = resource.handler(request)
       Ok(res)
     }
-    Error(_) -> todo
+    Error(_) -> {
+      jsonrpc.invalid_params
+      // TODO
+      |> jsonrpc.error_response(jsonrpc.NullId)
+      |> jsonrpc.error_response_to_json(jsonrpc.nothing_to_json)
+      |> Error
+    }
   }
 }
 
 pub fn list_prompts(
   server: Server,
   _request: mcp.ListPromptsRequest,
-) -> Result(mcp.ListPromptsResult, mcp.McpError) {
+) -> Result(mcp.ListPromptsResult, json.Json) {
   let prompts =
     dict.values(server.prompts)
     |> list.map(fn(p) { p.prompt })
@@ -491,20 +505,26 @@ pub fn list_prompts(
 pub fn get_prompt(
   server: Server,
   request: mcp.GetPromptRequest,
-) -> Result(mcp.GetPromptResult, mcp.McpError) {
+) -> Result(mcp.GetPromptResult, json.Json) {
   case dict.get(server.prompts, request.name) {
     Ok(prompt) -> {
       let assert Ok(res) = prompt.handler(request)
       Ok(res)
     }
-    Error(_) -> todo
+    Error(_) -> {
+      jsonrpc.invalid_params
+      // TODO
+      |> jsonrpc.error_response(jsonrpc.NullId)
+      |> jsonrpc.error_response_to_json(jsonrpc.nothing_to_json)
+      |> Error
+    }
   }
 }
 
 pub fn list_tools(
   server: Server,
   _request: mcp.ListToolsRequest,
-) -> Result(mcp.ListToolsResult, mcp.McpError) {
+) -> Result(mcp.ListToolsResult, json.Json) {
   let tools =
     dict.values(server.tools)
     |> list.map(fn(t) { t.tool })
@@ -514,15 +534,22 @@ pub fn list_tools(
 pub fn call_tool(
   server: Server,
   request: mcp.CallToolRequest,
-) -> Result(mcp.CallToolResult, mcp.McpError) {
+) -> Result(mcp.CallToolResult, json.Json) {
   case dict.get(server.tools, request.name) {
     Ok(tool) -> {
       let assert Ok(res) = tool.handler(request)
       Ok(res)
     }
-    Error(_) -> todo
+    Error(_) -> {
+      jsonrpc.invalid_params
+      // TODO
+      |> jsonrpc.error_response(jsonrpc.NullId)
+      |> jsonrpc.error_response_to_json(jsonrpc.nothing_to_json)
+      |> Error
+    }
   }
 }
+
 // pub fn notification_resources_list_changed(
 //   server: Server,
 //   request: request,
@@ -550,3 +577,13 @@ pub fn call_tool(
 // ) -> Result(result, mcp.McpError) {
 //   todo
 // }
+
+fn decode_errors_json(
+  result: Result(a, List(decode.DecodeError)),
+  id: jsonrpc.Id,
+) -> Result(a, json.Json) {
+  result
+  |> result.map_error(jsonrpc.decode_errors)
+  |> result.map_error(jsonrpc.error_response(_, id))
+  |> result.map_error(jsonrpc.error_response_to_json(_, jsonrpc.nothing_to_json))
+}

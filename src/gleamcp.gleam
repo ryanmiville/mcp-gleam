@@ -29,14 +29,18 @@ fn loop(server: server.Server) -> Result(Nil, Nil) {
     server.handle_message(server, msg)
     |> result.replace_error(Nil)
   use json <- result.try(res)
-  json.to_string(json) |> echo |> io.println
+  case json {
+    Some(json) -> json.to_string(json) |> echo |> io.println
+
+    None -> Nil
+  }
   loop(server)
 }
 
 fn print(server) {
   let _ =
     server.handle_message(server, list_prompts)
-    |> result.map(json.to_string)
+    |> result.map(fn(r) { option.map(r, json.to_string) })
     |> echo
   Ok(Nil)
 }
