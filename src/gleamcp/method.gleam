@@ -47,3 +47,8 @@ pub const notification_prompts_list_changed = "notifications/prompts/list_change
 /// Notifies when the list of available tools changes.
 /// https://spec.modelcontextprotocol.io/specification/2024-11-05/server/tools/list_changed/
 pub const notification_tools_list_changed = "notifications/tools/list_changed"
+
+/// Notifies that a previously-issued request is cancelled.
+pub const notification_cancelled = "notifications/cancelled"
+
+pub const completion_complete = "completion/complete"
