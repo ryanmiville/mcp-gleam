@@ -8,8 +8,7 @@ import jsonrpc
 
 import gleam/option.{type Option, None, Some}
 
-// import gleamcp/mcp
-import gleamcp/spec as mcp
+import gleamcp/mcp
 
 pub type Builder {
   Builder(

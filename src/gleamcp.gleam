@@ -5,7 +5,7 @@ import gleam/json
 import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
-import gleamcp/spec as mcp
+import gleamcp/mcp
 
 import gleamcp/server
 import gleamcp/server/stdio
@@ -24,27 +24,25 @@ pub fn main() {
   }
 }
 
-fn loop(server: server.Server) -> Result(Nil, Nil) {
-  use msg <- result.try(stdio.read_message())
-  echo msg
-  let res =
-    server.handle_message(server, msg)
-    |> result.replace_error(Nil)
-  use json <- result.try(res)
-  case json {
-    Some(json) -> json.to_string(json) |> echo |> io.println
-
-    None -> Nil
+fn loop(server: server.Server) -> Nil {
+  case stdio.read_message() |> echo {
+    Ok(msg) -> {
+      case server.handle_message(server, msg) {
+        Ok(Some(json)) | Error(json) -> io.println(json.to_string(json) |> echo)
+        _ -> Nil
+      }
+    }
+    Error(_) -> Nil
   }
   loop(server)
 }
 
-fn print(server) {
+fn print(server: server.Server) -> Nil {
   let _ =
     server.handle_message(server, list_prompts)
     |> result.map(fn(r) { option.map(r, json.to_string) })
     |> echo
-  Ok(Nil)
+  Nil
 }
 
 fn prompt() {
