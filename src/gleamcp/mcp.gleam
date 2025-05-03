@@ -9,6 +9,15 @@ import jsonrpc
 
 pub const protocol_version = "2024-11-05"
 
+pub type McpError {
+  ParseError
+  InvalidRequest
+  MethodNotFound
+  InvalidParams
+  InternalError
+  ApplicationError(message: String)
+}
+
 pub type Annotations {
   Annotations(audience: Option(List(Role)), priority: Option(Float))
 }

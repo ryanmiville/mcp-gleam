@@ -51,7 +51,7 @@ pub fn instructions(builder: Builder, instructions: String) -> Builder {
 pub fn add_resource(
   builder: Builder,
   resource: mcp.Resource,
-  handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+  handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, String),
 ) -> Builder {
   let capabilities = case builder.capabilities.resources {
     None ->
@@ -79,7 +79,7 @@ pub fn add_resource(
 pub fn add_resource_template(
   builder: Builder,
   template: mcp.ResourceTemplate,
-  handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+  handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, String),
 ) -> Builder {
   let capabilities = case builder.capabilities.resources {
     None ->
@@ -108,7 +108,8 @@ pub fn add_tool(
   builder: Builder,
   tool: mcp.Tool,
   arguments_decoder: Decoder(arguments),
-  handler: fn(mcp.CallToolRequest(arguments)) -> Result(mcp.CallToolResult, Nil),
+  handler: fn(mcp.CallToolRequest(arguments)) ->
+    Result(mcp.CallToolResult, String),
 ) -> Builder {
   let capabilities = case builder.capabilities.tools {
     None ->
@@ -131,17 +132,25 @@ pub fn add_tool(
 
 fn prompt_handler(
   arguments_decoder: Decoder(arguments),
-  handler: fn(mcp.CallToolRequest(arguments)) -> Result(mcp.CallToolResult, Nil),
-) -> fn(mcp.CallToolRequest(Dynamic)) -> Result(mcp.CallToolResult, Nil) {
+  handler: fn(mcp.CallToolRequest(arguments)) ->
+    Result(mcp.CallToolResult, String),
+) -> fn(mcp.CallToolRequest(Dynamic)) ->
+  Result(mcp.CallToolResult, mcp.McpError) {
   fn(request: mcp.CallToolRequest(Dynamic)) {
     case request.arguments {
-      None -> mcp.CallToolRequest(..request, arguments: None) |> handler
+      None ->
+        mcp.CallToolRequest(..request, arguments: None)
+        |> handler
+        |> result.map_error(mcp.ApplicationError)
+
       Some(dyn) ->
         case decode.run(dyn, arguments_decoder) {
-          // TODO handle this
-          Error(_) -> Error(Nil)
           Ok(args) ->
-            mcp.CallToolRequest(..request, arguments: Some(args)) |> handler
+            mcp.CallToolRequest(..request, arguments: Some(args))
+            |> handler
+            |> result.map_error(mcp.ApplicationError)
+
+          Error(_) -> Error(mcp.InvalidParams)
         }
     }
   }
@@ -150,7 +159,7 @@ fn prompt_handler(
 pub fn add_prompt(
   builder: Builder,
   prompt: mcp.Prompt,
-  handler: fn(mcp.GetPromptRequest) -> Result(mcp.GetPromptResult, Nil),
+  handler: fn(mcp.GetPromptRequest) -> Result(mcp.GetPromptResult, String),
 ) -> Builder {
   let capabilities = case builder.capabilities.prompts {
     None ->
@@ -251,28 +260,31 @@ pub fn build(builder: Builder) -> Server {
 pub opaque type ServerPrompt {
   ServerPrompt(
     prompt: mcp.Prompt,
-    handler: fn(mcp.GetPromptRequest) -> Result(mcp.GetPromptResult, Nil),
+    handler: fn(mcp.GetPromptRequest) -> Result(mcp.GetPromptResult, String),
   )
 }
 
 pub opaque type ServerResource {
   ServerResource(
     resource: mcp.Resource,
-    handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+    handler: fn(mcp.ReadResourceRequest) ->
+      Result(mcp.ReadResourceResult, String),
   )
 }
 
 pub opaque type ServerResourceTemplate {
   ServerResourceTemplate(
     template: mcp.ResourceTemplate,
-    handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+    handler: fn(mcp.ReadResourceRequest) ->
+      Result(mcp.ReadResourceResult, String),
   )
 }
 
 pub opaque type ServerTool {
   ServerTool(
     tool: mcp.Tool,
-    handler: fn(mcp.CallToolRequest(Dynamic)) -> Result(mcp.CallToolResult, Nil),
+    handler: fn(mcp.CallToolRequest(Dynamic)) ->
+      Result(mcp.CallToolResult, mcp.McpError),
   )
 }
 
@@ -511,6 +523,7 @@ pub fn read_resource(
 ) -> Result(mcp.ReadResourceResult, json.Json) {
   case dict.get(server.resources, request.uri) {
     Ok(resource) -> {
+      // TODO
       let assert Ok(res) = resource.handler(request)
       Ok(res)
     }
@@ -540,6 +553,7 @@ pub fn get_prompt(
 ) -> Result(mcp.GetPromptResult, json.Json) {
   case dict.get(server.prompts, request.name) {
     Ok(prompt) -> {
+      // TODO
       let assert Ok(res) = prompt.handler(request)
       Ok(res)
     }
@@ -569,6 +583,7 @@ pub fn call_tool(
 ) -> Result(mcp.CallToolResult, json.Json) {
   case dict.get(server.tools, request.name) {
     Ok(tool) -> {
+      // TODO
       let assert Ok(res) = tool.handler(request)
       Ok(res)
     }
