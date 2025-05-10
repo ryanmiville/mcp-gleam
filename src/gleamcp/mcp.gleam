@@ -7,6 +7,7 @@ import gleam/option.{type Option}
 import gleamcp/json_schema
 import jsonrpc
 
+// 2025-03-26
 pub const protocol_version = "2024-11-05"
 
 pub type McpError {
@@ -19,6 +20,7 @@ pub type McpError {
 }
 
 pub type Annotations {
+  // priority is a lie. The TS SDK doesn't have it.
   Annotations(audience: Option(List(Role)), priority: Option(Float))
 }
 

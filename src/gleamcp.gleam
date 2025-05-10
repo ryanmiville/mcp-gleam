@@ -7,7 +7,7 @@ import gleam/result
 import gleam/string
 import gleamcp/mcp
 
-import gleamcp/server
+import gleamcp/bleh_server as server
 import gleamcp/server/stdio
 
 pub fn main() {
