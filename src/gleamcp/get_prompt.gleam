@@ -1,57 +1,86 @@
-pub type Request
+import gleam/dynamic/decode.{type Decoder}
+import gleam/json.{type Json}
+import gleam/option.{type Option, None, Some}
+import gleamcp/content.{type Content}
+import gleamcp/internal
+import gleamcp/role.{type Role}
 
-pub type Response
-
-pub type Message
-
-pub type Role
-
-pub type Body
-
-pub fn request(name: String) -> Request {
-  todo
+pub type Request(arguments) {
+  Request(name: String, arguments: Option(arguments))
 }
 
-pub fn arguments(request: Request, arguments: Body) -> Request {
-  todo
+pub type Response {
+  Response(description: Option(String), messages: List(Message))
+}
+
+pub type Message {
+  Message(role: Role, content: Content)
+}
+
+pub fn request(name: String) -> Request(arguments) {
+  Request(name:, arguments: None)
+}
+
+pub fn arguments(
+  request: Request(a),
+  arguments: arguments,
+) -> Request(arguments) {
+  Request(..request, arguments: Some(arguments))
 }
 
 pub fn response() -> Response {
-  todo
+  Response(None, [])
 }
 
 pub fn description(response: Response, description: String) -> Response {
-  todo
+  Response(..response, description: Some(description))
 }
 
 pub fn add_message(response: Response, message: Message) -> Response {
-  todo
+  Response(..response, messages: [message, ..response.messages])
 }
 
-pub fn message(role: Role) -> Message {
-  todo
+pub fn request_decoder(
+  arguments_decoder: Decoder(arguments),
+) -> Decoder(Request(arguments)) {
+  use name <- decode.field("name", decode.string)
+  use arguments <- internal.omittable_field("arguments", arguments_decoder)
+  decode.success(Request(name:, arguments:))
 }
 
-pub fn annotations(message: Message, annotations) -> Message {
-  todo
+pub fn request_to_json(
+  request: Request(arguments),
+  arguments_to_json: fn(arguments) -> Json,
+) -> Json {
+  let Request(name:, arguments:) = request
+  [#("name", json.string(name))]
+  |> internal.omittable_to_json("arguments", arguments, arguments_to_json)
+  |> json.object
 }
 
-pub fn text(message: Message, text: String) -> Message {
-  todo
+pub fn response_decoder() -> Decoder(Response) {
+  use description <- internal.omittable_field("description", decode.string)
+  use messages <- decode.field("messages", decode.list(message_decoder()))
+  decode.success(Response(description:, messages:))
 }
 
-pub fn image_data(message: Message, data: String) -> Message {
-  todo
+pub fn response_to_json(response: Response) -> Json {
+  let Response(description:, messages:) = response
+  [#("messages", json.array(messages, message_to_json))]
+  |> internal.omittable_to_json("description", description, json.string)
+  |> json.object
 }
 
-pub fn audio_data(message: Message, data: String) -> Message {
-  todo
+fn message_decoder() -> Decoder(Message) {
+  use role <- decode.field("role", role.decoder())
+  use content <- decode.field("content", content.decoder())
+  decode.success(Message(role:, content:))
 }
 
-pub fn mime_type(message: Message, mime_type: String) -> Message {
-  todo
-}
-
-pub fn resource_content(message: Message, content) -> Message {
-  todo
+fn message_to_json(message: Message) -> Json {
+  let Message(role:, content:) = message
+  json.object([
+    #("role", role.to_json(role)),
+    #("content", content.to_json(content)),
+  ])
 }

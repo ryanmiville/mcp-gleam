@@ -29,7 +29,7 @@ pub type Builder {
     resources: Dict(String, ServerResource),
     resource_templates: Dict(String, ServerResourceTemplate),
     tools: Dict(String, ServerTool),
-    prompts: Dict(String, ServerPrompt),
+    // prompts: Dict(String, ServerPrompt),
     capabilities: mcp.ServerCapabilities,
     page_limit: Option(Int),
   )
@@ -44,7 +44,7 @@ pub fn new(name name: String, version version: String) -> Builder {
     resources: dict.new(),
     resource_templates: dict.new(),
     tools: dict.new(),
-    prompts: dict.new(),
+    // prompts: dict.new(),
     capabilities: mcp.ServerCapabilities(None, None, None, None, None),
     page_limit: None,
   )
@@ -167,29 +167,29 @@ fn prompt_handler(
   }
 }
 
-pub fn add_prompt(
-  builder: Builder,
-  prompt: mcp.Prompt,
-  handler: fn(get_prompt.Request) -> Result(get_prompt.Response, McpError),
-) -> Builder {
-  let capabilities = case builder.capabilities.prompts {
-    None ->
-      mcp.ServerCapabilities(
-        ..builder.capabilities,
-        prompts: Some(mcp.ServerCapabilitiesPrompts(None)),
-      )
-    Some(_) -> builder.capabilities
-  }
-  Builder(
-    ..builder,
-    prompts: dict.insert(
-      builder.prompts,
-      prompt.name,
-      ServerPrompt(prompt, handler),
-    ),
-    capabilities:,
-  )
-}
+// pub fn add_prompt(
+//   builder: Builder,
+//   prompt: mcp.Prompt,
+//   handler: fn(get_prompt.Request(a)) -> Result(get_prompt.Response, McpError),
+// ) -> Builder {
+//   let capabilities = case builder.capabilities.prompts {
+//     None ->
+//       mcp.ServerCapabilities(
+//         ..builder.capabilities,
+//         prompts: Some(mcp.ServerCapabilitiesPrompts(None)),
+//       )
+//     Some(_) -> builder.capabilities
+//   }
+//   Builder(
+//     ..builder,
+//     prompts: dict.insert(
+//       builder.prompts,
+//       prompt.name,
+//       ServerPrompt(prompt, handler),
+//     ),
+//     capabilities:,
+//   )
+// }
 
 pub fn resource_capabilities(
   builder: Builder,
@@ -247,7 +247,7 @@ pub opaque type Server {
     resources: Dict(String, ServerResource),
     resource_templates: Dict(String, ServerResourceTemplate),
     tools: Dict(String, ServerTool),
-    prompts: Dict(String, ServerPrompt),
+    // prompts: Dict(String, ServerPrompt),
     capabilities: mcp.ServerCapabilities,
     page_limit: Option(Int),
   )
@@ -262,18 +262,18 @@ pub fn build(builder: Builder) -> Server {
     resources: builder.resources,
     resource_templates: builder.resource_templates,
     tools: builder.tools,
-    prompts: builder.prompts,
+    // prompts: builder.prompts,
     capabilities: builder.capabilities,
     page_limit: builder.page_limit,
   )
 }
 
-pub opaque type ServerPrompt {
-  ServerPrompt(
-    prompt: mcp.Prompt,
-    handler: fn(get_prompt.Request) -> Result(get_prompt.Response, McpError),
-  )
-}
+// pub opaque type ServerPrompt {
+//   ServerPrompt(
+//     prompt: mcp.Prompt,
+//     handler: fn(get_prompt.Request) -> Result(get_prompt.Response, McpError),
+//   )
+// }
 
 pub opaque type ServerResource {
   ServerResource(
