@@ -1,11 +1,34 @@
-pub type Request
+import gleam/dynamic/decode.{type Decoder}
+import gleam/json.{type Json}
 
-pub type Response
+pub opaque type Request {
+  Request
+}
+
+pub opaque type Response {
+  Response
+}
 
 pub fn request() -> Request {
-  todo
+  Request
 }
 
 pub fn response() -> Response {
-  todo
+  Response
+}
+
+pub fn request_decoder() -> Decoder(Request) {
+  decode.success(Request)
+}
+
+pub fn request_to_json(_request: Request) -> Json {
+  json.object([])
+}
+
+pub fn response_decoder() -> Decoder(Response) {
+  decode.success(Response)
+}
+
+pub fn response_to_json(_response: Response) -> Json {
+  json.object([])
 }
