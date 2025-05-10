@@ -25,7 +25,7 @@ fn test_case(
 pub fn request_test() {
   ping.request()
   |> test_case(
-    title: "request",
+    title: "ping request",
     encode: ping.request_to_json,
     decoder: ping.request_decoder(),
   )
@@ -34,7 +34,7 @@ pub fn request_test() {
 pub fn response_test() {
   ping.response()
   |> test_case(
-    title: "response",
+    title: "ping response",
     encode: ping.response_to_json,
     decoder: ping.response_decoder(),
   )

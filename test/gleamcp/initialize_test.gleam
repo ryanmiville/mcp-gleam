@@ -25,7 +25,7 @@ fn test_case(
 pub fn request_test() {
   initialize.request("client", "1.0.0")
   |> test_case(
-    title: "request with no capabilities",
+    title: "initialize request with no capabilities",
     encode: initialize.request_to_json,
     decoder: initialize.request_decoder(),
   )
@@ -35,7 +35,7 @@ pub fn request_roots_test() {
   initialize.request("client", "1.0.0")
   |> initialize.with_roots(False)
   |> test_case(
-    title: "request with roots",
+    title: "initialize request with roots",
     encode: initialize.request_to_json,
     decoder: initialize.request_decoder(),
   )
@@ -46,7 +46,7 @@ pub fn request_everything_test() {
   |> initialize.with_roots(True)
   |> initialize.with_sampling()
   |> test_case(
-    title: "request with everything",
+    title: "initialize request with everything",
     encode: initialize.request_to_json,
     decoder: initialize.request_decoder(),
   )
@@ -55,7 +55,7 @@ pub fn request_everything_test() {
 pub fn response_test() {
   initialize.response("server", "1.0.0")
   |> test_case(
-    title: "response no capabilities",
+    title: "initialize response no capabilities",
     encode: initialize.response_to_json,
     decoder: initialize.response_decoder(),
   )
@@ -65,7 +65,7 @@ pub fn response_instructions_test() {
   initialize.response("server", "1.0.0")
   |> initialize.instructions("do stuff")
   |> test_case(
-    title: "response with instructions",
+    title: "initialize response with instructions",
     encode: initialize.response_to_json,
     decoder: initialize.response_decoder(),
   )
@@ -75,7 +75,7 @@ pub fn response_resources_test() {
   initialize.response("server", "1.0.0")
   |> initialize.with_resources(list_changed: True, subscribe: False)
   |> test_case(
-    title: "response with resources",
+    title: "initialize response with resources",
     encode: initialize.response_to_json,
     decoder: initialize.response_decoder(),
   )
@@ -90,7 +90,7 @@ pub fn response_everything_test() {
   |> initialize.with_prompts(False)
   |> initialize.with_tools(True)
   |> test_case(
-    title: "response with everything",
+    title: "initialize response with everything",
     encode: initialize.response_to_json,
     decoder: initialize.response_decoder(),
   )
