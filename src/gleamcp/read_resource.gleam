@@ -1,33 +1,46 @@
-pub type Request
+import gleam/dynamic/decode
+import gleam/json
+import gleamcp/resource.{type Content}
 
-pub type Response
+pub type Request {
+  Request(uri: String)
+}
 
-pub type Content
+pub type Response {
+  Response(contents: List(Content))
+}
 
 pub fn request(uri: String) -> Request {
-  todo
+  Request(uri:)
 }
 
 pub fn response() -> Response {
-  todo
+  Response([])
 }
 
 pub fn add_content(response: Response, content: Content) -> Response {
-  todo
+  Response(contents: [content, ..response.contents])
 }
 
-pub fn content(uri: String) -> Content {
-  todo
+pub fn request_decoder() -> decode.Decoder(Request) {
+  use uri <- decode.field("uri", decode.string)
+  decode.success(Request(uri:))
 }
 
-pub fn blob(content: Content, blob: String) -> Content {
-  todo
+pub fn request_to_json(request: Request) -> json.Json {
+  let Request(uri:) = request
+  json.object([#("uri", json.string(uri))])
 }
 
-pub fn text(content: Content, text: String) -> Content {
-  todo
+pub fn response_decoder() -> decode.Decoder(Response) {
+  use contents <- decode.field(
+    "contents",
+    decode.list(resource.content_decoder()),
+  )
+  decode.success(Response(contents:))
 }
 
-pub fn mime_type(content: Content, mime_type: String) -> Content {
-  todo
+pub fn response_to_json(response: Response) -> json.Json {
+  let Response(contents:) = response
+  json.object([#("contents", json.array(contents, resource.content_to_json))])
 }
