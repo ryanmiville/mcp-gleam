@@ -1,0 +1,5 @@
+---
+version: 1.2.7
+title: response with instructions
+---
+{"instructions":"do stuff","protocolVersion":"2024-11-05","serverInfo":{"name":"server","version":"1.0.0"},"capabilities":{}}

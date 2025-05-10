@@ -1,13 +1,24 @@
+import gleam/bytes_tree.{type BytesTree}
 import gleam/dict.{type Dict}
-import gleam/dynamic/decode.{type Dynamic}
-import gleam/json
-import gleam/list
-import gleam/result
-import gleamcp/method
-import jsonrpc
-
+import gleam/dynamic/decode.{type Decoder, type Dynamic}
 import gleam/option.{type Option, None, Some}
-import gleamcp/mcp
+import gleam/result
+import gleam/string_tree.{type StringTree}
+import gleamcp/get_prompt
+import gleamcp/mcp.{type McpError}
+import gleamcp/read_resource
+import gleamcp/resource
+
+pub type Body {
+  Text(StringTree)
+  Bytes(BytesTree)
+  Empty
+}
+
+pub type Response {
+  Response(result: Body)
+  ErrorResponse(code: Int, message: String, data: Body)
+}
 
 pub type Builder {
   Builder(
@@ -49,14 +60,17 @@ pub fn instructions(builder: Builder, instructions: String) -> Builder {
 
 pub fn add_resource(
   builder: Builder,
-  resource: mcp.Resource,
-  handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+  resource: resource.Resource,
+  handler: fn(read_resource.Request) -> Result(read_resource.Response, McpError),
 ) -> Builder {
   let capabilities = case builder.capabilities.resources {
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        resources: Some(mcp.ResourceCapabilities(False, False)),
+        resources: Some(mcp.ServerCapabilitiesResources(
+          Some(False),
+          Some(False),
+        )),
       )
     Some(_) -> builder.capabilities
   }
@@ -65,7 +79,8 @@ pub fn add_resource(
     ..builder,
     resources: dict.insert(
       builder.resources,
-      resource.uri,
+      // resource.uri,
+      todo,
       ServerResource(resource, handler),
     ),
     capabilities:,
@@ -75,13 +90,16 @@ pub fn add_resource(
 pub fn add_resource_template(
   builder: Builder,
   template: mcp.ResourceTemplate,
-  handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+  handler: fn(read_resource.Request) -> Result(read_resource.Response, McpError),
 ) -> Builder {
   let capabilities = case builder.capabilities.resources {
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        resources: Some(mcp.ResourceCapabilities(False, False)),
+        resources: Some(mcp.ServerCapabilitiesResources(
+          Some(False),
+          Some(False),
+        )),
       )
     Some(_) -> builder.capabilities
   }
@@ -91,7 +109,7 @@ pub fn add_resource_template(
     resource_templates: dict.insert(
       builder.resource_templates,
       template.name,
-      ServerResourceTemplate(template, handler),
+      ServerResourceTemplate(template, todo),
     ),
     capabilities:,
   )
@@ -100,33 +118,65 @@ pub fn add_resource_template(
 pub fn add_tool(
   builder: Builder,
   tool: mcp.Tool,
-  handler: fn(mcp.CallToolRequest) -> Result(mcp.CallToolResult, Nil),
+  arguments_decoder: Decoder(arguments),
+  handler: fn(mcp.CallToolRequest(arguments)) ->
+    Result(mcp.CallToolResult, String),
 ) -> Builder {
   let capabilities = case builder.capabilities.tools {
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        tools: Some(mcp.ToolCapabilities(False)),
+        tools: Some(mcp.ServerCapabilitiesTools(None)),
       )
     Some(_) -> builder.capabilities
   }
   Builder(
     ..builder,
-    tools: dict.insert(builder.tools, tool.name, ServerTool(tool, handler)),
+    tools: dict.insert(
+      builder.tools,
+      tool.name,
+      ServerTool(tool, prompt_handler(arguments_decoder, handler)),
+    ),
     capabilities:,
   )
+}
+
+fn prompt_handler(
+  arguments_decoder: Decoder(arguments),
+  handler: fn(mcp.CallToolRequest(arguments)) ->
+    Result(mcp.CallToolResult, String),
+) -> fn(mcp.CallToolRequest(Dynamic)) ->
+  Result(mcp.CallToolResult, mcp.McpError) {
+  fn(request: mcp.CallToolRequest(Dynamic)) {
+    case request.arguments {
+      None ->
+        mcp.CallToolRequest(..request, arguments: None)
+        |> handler
+        |> result.map_error(mcp.ApplicationError)
+
+      Some(dyn) ->
+        case decode.run(dyn, arguments_decoder) {
+          Ok(args) ->
+            mcp.CallToolRequest(..request, arguments: Some(args))
+            |> handler
+            |> result.map_error(mcp.ApplicationError)
+
+          Error(_) -> Error(mcp.InvalidParams)
+        }
+    }
+  }
 }
 
 pub fn add_prompt(
   builder: Builder,
   prompt: mcp.Prompt,
-  handler: fn(mcp.GetPromptRequest) -> Result(mcp.GetPromptResult, Nil),
+  handler: fn(get_prompt.Request) -> Result(get_prompt.Response, McpError),
 ) -> Builder {
   let capabilities = case builder.capabilities.prompts {
     None ->
       mcp.ServerCapabilities(
         ..builder.capabilities,
-        prompts: Some(mcp.PromptCapabilities(False)),
+        prompts: Some(mcp.ServerCapabilitiesPrompts(None)),
       )
     Some(_) -> builder.capabilities
   }
@@ -149,7 +199,10 @@ pub fn resource_capabilities(
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      resources: Some(mcp.ResourceCapabilities(subscribe, list_changed)),
+      resources: Some(mcp.ServerCapabilitiesResources(
+        Some(subscribe),
+        Some(list_changed),
+      )),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -158,7 +211,7 @@ pub fn prompt_capabilities(builder: Builder, list_changed: Bool) {
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      prompts: Some(mcp.PromptCapabilities(list_changed)),
+      prompts: Some(mcp.ServerCapabilitiesPrompts(Some(list_changed))),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -167,7 +220,7 @@ pub fn tool_capabilities(builder: Builder, list_changed: Bool) {
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      tools: Some(mcp.ToolCapabilities(list_changed)),
+      tools: Some(mcp.ServerCapabilitiesTools(Some(list_changed))),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -176,7 +229,7 @@ pub fn enable_logging(builder: Builder) {
   let capabilities =
     mcp.ServerCapabilities(
       ..builder.capabilities,
-      logging: Some(mcp.LoggingCapabilities),
+      logging: Some(mcp.ServerCapabilitiesLogging),
     )
   Builder(..builder, capabilities: capabilities)
 }
@@ -218,334 +271,50 @@ pub fn build(builder: Builder) -> Server {
 pub opaque type ServerPrompt {
   ServerPrompt(
     prompt: mcp.Prompt,
-    handler: fn(mcp.GetPromptRequest) -> Result(mcp.GetPromptResult, Nil),
+    handler: fn(get_prompt.Request) -> Result(get_prompt.Response, McpError),
   )
 }
 
 pub opaque type ServerResource {
   ServerResource(
-    resource: mcp.Resource,
-    handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+    resource: resource.Resource,
+    handler: fn(read_resource.Request) ->
+      Result(read_resource.Response, McpError),
   )
 }
 
+// TODO
 pub opaque type ServerResourceTemplate {
   ServerResourceTemplate(
     template: mcp.ResourceTemplate,
-    handler: fn(mcp.ReadResourceRequest) -> Result(mcp.ReadResourceResult, Nil),
+    handler: fn(mcp.ReadResourceRequest) ->
+      Result(mcp.ReadResourceResult, McpError),
   )
 }
 
 pub opaque type ServerTool {
   ServerTool(
     tool: mcp.Tool,
-    handler: fn(mcp.CallToolRequest) -> Result(mcp.CallToolResult, Nil),
+    handler: fn(mcp.CallToolRequest(Dynamic)) ->
+      Result(mcp.CallToolResult, mcp.McpError),
   )
 }
-
-pub fn handle_message(
-  server: Server,
-  message: String,
-) -> Result(json.Json, mcp.McpError) {
-  let result =
-    json.parse(message, jsonrpc.message_decoder())
-    |> result.map_error(mcp.UnexpectedJsonError)
-
-  use msg <- result.try(result)
-  case msg {
-    jsonrpc.RequestMessage(request) -> handle_request(server, request)
-
-    jsonrpc.NotificationMessage(notification) ->
-      handle_notification(server, notification)
-
-    _ -> Error(mcp.ReceivedResponse)
-  }
-}
-
-fn handle_request(
-  server: Server,
-  request: jsonrpc.Request(Dynamic),
-) -> Result(json.Json, mcp.McpError) {
-  case request.method {
-    m if m == method.initialize -> {
-      require_params(
-        server,
-        request,
-        initialize,
-        mcp.initialize_request_decoder(),
-        mcp.encode_initialize_result,
-      )
-    }
-
-    m if m == method.ping -> {
-      case request.params {
-        None ->
-          ping(server, mcp.PingRequest)
-          |> result.map(jsonrpc.response(_, request.id))
-          |> result.map(jsonrpc.encode_response(_, mcp.encode_empty_result))
-        _ ->
-          jsonrpc.invalid_params
-          |> jsonrpc.error_response(request.id)
-          |> jsonrpc.encode_error_response(jsonrpc.encode_nothing)
-          |> Ok
-      }
-    }
-
-    m if m == method.resources_list -> {
-      paginated_params(
-        server,
-        request,
-        list_resources,
-        mcp.encode_list_resources_result,
-      )
-    }
-
-    m if m == method.resources_read -> {
-      require_params(
-        server,
-        request,
-        read_resource,
-        mcp.read_resource_request_decoder(),
-        mcp.encode_read_resource_result,
-      )
-    }
-
-    m if m == method.resources_templates_list -> {
-      paginated_params(
-        server,
-        request,
-        list_resources,
-        mcp.encode_list_resources_result,
-      )
-    }
-
-    m if m == method.prompts_list -> {
-      paginated_params(
-        server,
-        request,
-        list_prompts,
-        mcp.encode_list_prompts_result,
-      )
-    }
-
-    m if m == method.prompts_get -> {
-      require_params(
-        server,
-        request,
-        get_prompt,
-        mcp.get_prompt_request_decoder(),
-        mcp.encode_get_prompt_result,
-      )
-    }
-
-    m if m == method.tools_list -> {
-      paginated_params(
-        server,
-        request,
-        list_tools,
-        mcp.encode_list_tools_result,
-      )
-    }
-
-    m if m == method.tools_call -> {
-      require_params(
-        server,
-        request,
-        call_tool,
-        mcp.call_tool_request_decoder(),
-        mcp.encode_call_tool_result,
-      )
-    }
-    _ ->
-      jsonrpc.method_not_found
-      |> jsonrpc.error_response(request.id)
-      |> jsonrpc.encode_error_response(jsonrpc.encode_nothing)
-      |> Ok
-  }
-}
-
-fn require_params(
-  server: Server,
-  request: jsonrpc.Request(Dynamic),
-  handler: fn(Server, a) -> Result(b, mcp.McpError),
-  params_decoder: decode.Decoder(a),
-  result_encoder: fn(b) -> json.Json,
-) -> Result(json.Json, mcp.McpError) {
-  case request.params {
-    None ->
-      jsonrpc.invalid_params
-      |> jsonrpc.error_response(request.id)
-      |> jsonrpc.encode_error_response(jsonrpc.encode_nothing)
-      |> Ok
-    Some(params) ->
-      decode.run(params, params_decoder)
-      |> result.map_error(mcp.DecodeError)
-      |> result.try(handler(server, _))
-      |> result.map(jsonrpc.response(_, request.id))
-      |> result.map(jsonrpc.encode_response(_, result_encoder))
-  }
-}
-
-fn paginated_params(
-  server: Server,
-  request: jsonrpc.Request(Dynamic),
-  handler: fn(Server, mcp.ListRequest) -> Result(a, mcp.McpError),
-  encoder: fn(a) -> json.Json,
-) -> Result(json.Json, mcp.McpError) {
-  case request.params {
-    None ->
-      handler(server, mcp.ListRequest(None))
-      |> result.map(jsonrpc.response(_, request.id))
-      |> result.map(jsonrpc.encode_response(_, encoder))
-
-    Some(params) ->
-      decode.run(params, mcp.list_request_decoder())
-      |> result.map_error(mcp.DecodeError)
-      |> result.try(handler(server, _))
-      |> result.map(jsonrpc.response(_, request.id))
-      |> result.map(jsonrpc.encode_response(_, encoder))
-  }
-}
-
-fn handle_notification(
-  _server: Server,
-  notification: jsonrpc.Notification(Dynamic),
-) -> Result(json.Json, mcp.McpError) {
-  case notification.method {
-    // m if m == method.notification_resources_list_changed -> todo
-    // m if m == method.notification_resource_updated -> todo
-    // m if m == method.notification_prompts_list_changed -> todo
-    // m if m == method.notification_tools_list_changed -> todo
-    _ -> Error(mcp.UnsupportedNotification(notification.method))
-  }
-}
-
-pub fn initialize(
-  server: Server,
-  _request: mcp.InitializeRequest,
-) -> Result(mcp.InitializeResult, mcp.McpError) {
-  Ok(mcp.InitializeResult(
-    capabilities: server.capabilities,
-    protocol_version: mcp.protocol_version,
-    server_info: mcp.Implementation(server.name, server.version),
-    instructions: server.instructions,
-    meta: None,
-  ))
-}
-
-pub fn ping(
-  _server: Server,
-  _request: mcp.PingRequest,
-) -> Result(mcp.EmptyResult, mcp.McpError) {
-  Ok(mcp.EmptyResult)
-}
-
-pub fn list_resources(
-  server: Server,
-  _request: mcp.ListResourcesRequest,
-) -> Result(mcp.ListResourcesResult, mcp.McpError) {
-  let resources =
-    dict.values(server.resources)
-    |> list.map(fn(r) { r.resource })
-  Ok(mcp.ListResourcesResult(resources:, next_cursor: None, meta: None))
-}
-
-pub fn list_resource_templates(
-  server: Server,
-  _request: mcp.ListResourceTemplatesRequest,
-) -> Result(mcp.ListResourceTemplatesResult, mcp.McpError) {
-  let resource_templates =
-    dict.values(server.resource_templates)
-    |> list.map(fn(r) { r.template })
-  Ok(mcp.ListResourceTemplatesResult(
-    resource_templates:,
-    next_cursor: None,
-    meta: None,
-  ))
-}
-
-pub fn read_resource(
-  server: Server,
-  request: mcp.ReadResourceRequest,
-) -> Result(mcp.ReadResourceResult, mcp.McpError) {
-  case dict.get(server.resources, request.uri) {
-    Ok(resource) -> {
-      let assert Ok(res) = resource.handler(request)
-      Ok(res)
-    }
-    Error(_) -> todo
-  }
-}
-
-pub fn list_prompts(
-  server: Server,
-  _request: mcp.ListPromptsRequest,
-) -> Result(mcp.ListPromptsResult, mcp.McpError) {
-  let prompts =
-    dict.values(server.prompts)
-    |> list.map(fn(p) { p.prompt })
-  Ok(mcp.ListPromptsResult(prompts:, next_cursor: None, meta: None))
-}
-
-pub fn get_prompt(
-  server: Server,
-  request: mcp.GetPromptRequest,
-) -> Result(mcp.GetPromptResult, mcp.McpError) {
-  case dict.get(server.prompts, request.name) {
-    Ok(prompt) -> {
-      let assert Ok(res) = prompt.handler(request)
-      Ok(res)
-    }
-    Error(_) -> todo
-  }
-}
-
-pub fn list_tools(
-  server: Server,
-  _request: mcp.ListToolsRequest,
-) -> Result(mcp.ListToolsResult, mcp.McpError) {
-  let tools =
-    dict.values(server.tools)
-    |> list.map(fn(t) { t.tool })
-  Ok(mcp.ListToolsResult(tools:, next_cursor: None, meta: None))
-}
-
-pub fn call_tool(
-  server: Server,
-  request: mcp.CallToolRequest,
-) -> Result(mcp.CallToolResult, mcp.McpError) {
-  case dict.get(server.tools, request.name) {
-    Ok(tool) -> {
-      let assert Ok(res) = tool.handler(request)
-      Ok(res)
-    }
-    Error(_) -> todo
-  }
-}
-// pub fn notification_resources_list_changed(
-//   server: Server,
-//   request: request,
-// ) -> Result(result, mcp.McpError) {
+// pub fn handle_request(server: Server, request) -> Response {
 //   todo
 // }
 
-// pub fn notification_resource_updated(
-//   server: Server,
-//   request: request,
-// ) -> Result(result, mcp.McpError) {
+// pub fn handle_notification(server: Server, notification) -> Nil {
 //   todo
 // }
 
-// pub fn notification_prompts_list_changed(
-//   server: Server,
-//   request: request,
-// ) -> Result(result, mcp.McpError) {
+// pub fn handle_response(server: Server, response) -> Nil {
 //   todo
 // }
 
-// pub fn notification_tools_list_changed(
-//   server: Server,
-//   request: request,
-// ) -> Result(result, mcp.McpError) {
+// pub fn send_request(server: Server, request) -> Nil {
+//   todo
+// }
+
+// pub fn send_notification(server: Server, notification) -> Nil {
 //   todo
 // }
