@@ -1,27 +1,45 @@
-pub type Request
+import gleam/dynamic/decode
+import gleam/json
+import gleam/option.{type Option, None, Some}
+import gleamcp/internal
+import gleamcp/tool.{type Tool}
 
-pub type Response
-
-pub fn request(name: String) -> Request {
-  todo
+pub type Request {
+  Request(next_cursor: Option(String))
 }
 
-pub fn next_cursor(request: Request, next_cursor: String) -> Request {
-  todo
+pub type Response {
+  Response(tools: List(Tool), next_cursor: Option(String))
 }
 
-pub fn arguments(request: Request, arguments) -> Request {
-  todo
+pub fn request() -> Request {
+  Request(None)
+}
+
+pub fn request_with_cursor(next_cursor: String) -> Request {
+  Request(Some(next_cursor))
 }
 
 pub fn response() -> Response {
   todo
 }
 
-pub fn response_next_cursor(response: Response, next_cursor: String) -> Response {
+pub fn next_cursor(response: Response, next_cursor: String) -> Response {
   todo
 }
 
 pub fn add_tool(response: Response, tool) -> Response {
   todo
+}
+
+pub fn request_decoder() -> decode.Decoder(Request) {
+  use next_cursor <- internal.omittable_field("nextCursor", decode.string)
+  decode.success(Request(next_cursor:))
+}
+
+pub fn request_to_json(request: Request) -> json.Json {
+  let Request(next_cursor:) = request
+  []
+  |> internal.omittable_to_json("nextCursor", next_cursor, json.string)
+  |> json.object
 }
